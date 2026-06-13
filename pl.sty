@@ -1,0 +1,164 @@
+% aux
+\newcommand{\langHL}[1]{{\color{sblue} #1}}
+\newcommand{\col}{\mathrel{:}}
+\newcommand{\cc}{\mathrel{::}}
+\newcommand{\cceq}{\col\col=}
+\newcommand{\rawst}{<\col}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\setcomp}[2]{\left\{{#1} \;\middle|\; {#2}\right\}}
+\newcommand{\setof}[1]{\left\{{#1}\right\}}
+\newcommand{\suppI}[1]{\left|{#1}\right|_{\insts}}
+\newcommand{\impl}{\Rightarrow}
+\newcommand{\plug}[2]{{#1}[{#2}]}
+\newcommand{\subst}[3]{{#1}[{#3} / {#2}]}
+\newcommand{\eval}[2]{{#1} \downarrow {#2}}
+\newcommand{\sem}[1]{\llbracket {#1} \rrbracket}
+% \newcommand{\pointsto}[2]{{#1} \mapsto {#2}}
+\newcommand{\reds}[2]{{#1}\to{#2}}
+\newcommand*{\rom}[1]{\expandafter\@slowromancap\romannumeral #1@}
+\newcommand{\syn}[1]{\langHL{{\mathsf{#1}}}}
+\newcommand{\mvar}[1]{\mathit{#1}}
+\newcommand{\kw}[1]{\bm{\syn{#1}}}
+\newcommand{\synds}{\syn{.}~}
+\newcommand\bigcdot{\mathrel{\raisebox{1pt}{$\scriptscriptstyle\bullet$}}}
+\newcommand\holed[1]{[\,#1\,]}
+\newcommand\ctxhole{\holed\bigcdot}
+
+% meta sets
+\newcommand{\iIdent}{\mathrm{Ident}}
+\newcommand{\ident}{x}
+\newcommand{\iExpr}{\mathrm{Expr}}
+\newcommand{\expr}{e}
+\newcommand{\iVal}{\mathrm{Val}}
+\newcommand{\vv}{\vec v}
+\newcommand{\val}{v}
+\newcommand{\valB}{w}
+\newcommand{\valC}{u}
+\newcommand{\iECtx}{\mathrm{ECtx}}
+\newcommand{\ectx}{K}
+\newcommand{\iPCtx}{\mathrm{PCtx}}
+\newcommand{\pctx}{C}
+\newcommand{\iVar}{\mathrm{Var}}
+\newcommand{\var}{x}
+\newcommand{\varB}{y}
+\newcommand{\iLoc}{\mathrm{Loc}}
+\newcommand{\loc}{\ell}
+\newcommand{\iEnv}{\mathrm{Env}}
+\newcommand{\Env}{\Gamma}
+\newcommand{\env}{\gamma}
+\newcommand{\senv}{\delta}
+\newcommand{\iTVar}{\mathrm{TVar}}
+\newcommand{\tvar}{\alpha}
+\newcommand{\tvarB}{\beta}
+\newcommand{\iKind}{\mathrm{Kind}}
+\newcommand{\kind}{\kappa}
+\newcommand{\iConstr}{\mathrm{Constr}}
+\newcommand{\constr}{\chi}
+\newcommand{\iType}{\mathrm{Type}}
+\newcommand{\type}{\tau}
+\newcommand{\iNf}[2]{\mathrm{Nf}^{#1}_{#2}}
+\newcommand{\iNeu}[2]{\mathrm{Neu}^{#1}_{#2}}
+\newcommand{\iState}{\mathrm{State}}
+\newcommand{\state}{\sigma}
+\newcommand{\iConf}{\mathrm{Conf}}
+\newcommand{\iDom}{\mathbb{D}}
+
+% language types
+\newcommand{\tunit}{\syn{unit}}
+\newcommand{\tvoid}{\syn{void}}
+\newcommand{\tint}{\mathbb{Z}}
+\newcommand{\tbool}{\mathbb{B}}
+\newcommand{\tnat}{\syn{nat}}
+\newcommand{\tprod}[2]{{#1}\mathop{\syn{\times}}{#2}}
+\newcommand{\tsum}[2]{{#1}\mathop{\syn{+}}{#2}}
+\newcommand{\tarr}[2]{{#1}\mathop{\syn{\to}}{#2}}
+\newcommand{\tall}[3]{\syn{\forall}{#1}\cc{#2}\synds{#3}}
+\newcommand{\txist}[3]{\syn{\exists}{#1}\cc{#2}\synds{#3}}
+\newcommand{\tlam}[3]{\syn{\lambda}{#1}\cc{#2}\synds{#3}}
+\newcommand{\tapp}[2]{{#1}\;{#2}}
+\newcommand{\tref}[1]{\syn{ref}\,{#1}}
+\newcommand{\tind}[3]{\syn{\mu}{#1}\cc{#2}\synds{#3}}
+\newcommand{\teq}[3]{{#2} \mathop{\equiv_{#1}} {#3}}
+\newcommand{\ttop}{\top}
+\newcommand{\tbot}{\bot}
+\newcommand{\tcont}[1]{\mathit{cont}({#1})}
+
+% heaplang highlighting
+\newcommand{\textlang}[1]{\textsf{#1}}
+\newcommand{\langkw}[1]{\textlang{\color{blue} #1}}
+
+% values
+\newcommand{\vlit}[1]{\mathrm{lit}\; {#1}}
+\newcommand{\vunit}{\syn{\langle\rangle}}
+\newcommand{\vpair}[2]{\syn{\langle}{#1}, {#2}\syn{\rangle}}
+\newcommand{\vinj}[2]{\syn{inj}_{#1}\,{#2}}
+\newcommand{\vtlam}[1]{{\Lambda}\synds{#1}}
+\newcommand{\vpack}[1]{\syn{pack}\,{#1}}
+\newcommand{\vroll}[1]{\syn{roll}\,{#1}}
+\newcommand{\vlam}[2]{\syn{\lambda}{#1}\synds{#2}}
+\newcommand{\vrec}[3]{\syn{\mathrm{fix}}\;{#1}\;{#2}\synds{#3}}
+% from heaplang
+\newcommand{\vtrue}{\langkw{true}}
+\newcommand{\vfalse}{\langkw{false}}
+
+% expressions
+\newcommand{\elet}[3]{\syn{let}\,{#1} = {#2}\,\syn{in}\,{#3}}
+\newcommand{\eapp}[2]{{#1}\;{#2}}
+\newcommand{\etapp}[1]{\eapp{#1}{\mathord{*}}}
+\newcommand{\eproj}[2]{\syn{proj}_{#1}\,{#2}}
+\newcommand{\ecase}[5]{\syn{case}\,{#1}\,\syn{[}{#2}\synds{#3}\,\syn{\mid}\,{#4}\synds{#5}\syn{]}}
+\newcommand{\eabort}[1]{\syn{abort}\,{#1}}
+\newcommand{\eunroll}[1]{\syn{unroll}\,{#1}}
+\newcommand{\efork}[1]{\syn{fork}\,{#1}}
+\newcommand{\ealloc}[1]{\syn{alloc}\,{#1}}
+\newcommand{\eassign}[2]{{#1} \syn{\mathrel{:=}} {#2}}
+\newcommand{\ederef}[1]{\syn{\mathop{!}}{#1}}
+\newcommand{\enatop}[3]{{#2} \syn{\mathrel{{#1}}} {#3}}
+\newcommand{\callcc}[2]{\syn{call/cc}~(\syn{{#1}}\synds{#2})}
+\newcommand{\cont}[1]{\syn{cont}~{#1}}
+\newcommand{\throw}[2]{\syn{throw}~{#1}~\syn{to}~{#2}}
+% from heaplang
+\newcommand{\fold}{\langkw{fold}\spac}
+\newcommand{\pack}{\langkw{pack}\spac}
+\newcommand{\unfold}{\langkw{unfold}\spac}
+
+
+% aux
+\newcommand{\inpar}[1]{{\color{orange} (} {#1} {\color{orange} )}}
+
+% syntactic and semantic typing
+\newcommand{\typed}[3]{{#1}\vdash{#2}\col{#3}}
+\newcommand{\typedSem}[3]{{#1}\models{#2}\col{#3}}
+
+% highlighting
+\newcommand{\absolutetextcolor}[2]{%
+    \textcolor{#1}{%
+        \renewcommand\color[2][]{}%
+    #2}%
+}
+\newcommand{\hhide}[1]{\textcolor{lightGrey}{#1}}
+\newcommand{\hlight}[1]{\textcolor{teal}{#1}}
+\newcommand{\hlightstronger}[1]{\textcolor{magenta}{#1}}
+\newcommand{\hlightbgm}[1]{\mathcolorbox{lightTeal}{#1}}
+\newcommand{\hlightbg}[1]{\colorbox{lightTeal}{#1}}
+\newcommand{\hlightstrongerbgm}[1]{\mathcolorbox{lightMagenta}{#1}}
+\newcommand{\hlightstrongerbg}[1]{\colorbox{lightMagenta}{#1}}
+
+% inference rule stuff
+
+% \textlabel label text: Print and label text.
+\newcommand*{\textlabel}[2]{{#2}\savelabel{#1}{#2}}
+% \rulenamestyle visible
+\newcommand*{\rulenamestyle}[1]{{\TirNameStyle{#1}}}	% From mathpartir.sty.
+% \ruleref [discharged] lab
+\def\optionaldischarge#1{%
+	\if\relax\detokenize{#1}\relax\else\ensuremath{^{#1}}\fi}
+\newcommand*{\ruleref}[2][]{\textmd{\rulenamestyle{\ref{#2}}}\optionaldischarge{#1}}
+\newcommand*{\fakeruleref}[2][]{\rulenamestyle{#2}\optionaldischarge{#1}}
+% \rulename label
+\newcommand*{\rulename}[1]{\rulenamestyle{\textlabel{#1}{#1}}}
+% \inferhref name lab premise conclusion
+\newcommand*{\inferhref}[4]{%
+	\inferrule*[lab=\textlabel{#2}{#1}]{#3}{#4}%
+}
+

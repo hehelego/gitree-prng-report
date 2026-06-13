@@ -1,0 +1,1593 @@
+\documentclass{article}
+
+\usepackage[a4paper,margin=2cm]{geometry}
+
+\usepackage{amsmath, amsthm, amssymb, bm}
+\usepackage{extarrows}
+\usepackage{stmaryrd}
+\usepackage{xcolor}
+\definecolor{sblue}{cmyk}{1,.72,0,.38}
+\definecolor{lightTeal}{cmyk}{.2,0,.1,0}
+\definecolor{lightGrey}{gray}{.85}
+\definecolor{lightMagenta}{cmyk}{0,.5,0,.1}
+\usepackage{naive-ebnf}
+\usepackage{url}
+
+\usepackage{pl}
+\usepackage{iris}
+
+\usepackage[
+backend=biber,
+style=alphabetic,
+sorting=ynt
+]{biblatex}
+\addbibresource{refs.bib}
+
+\usepackage{listings}
+\definecolor{LightGray}{gray}{0.95}
+
+\usepackage{mathpartir}
+\usepackage{hyperref}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[section]
+
+\title{Exploring Guarded Interaction Trees}
+\author{Cheng (Charles) Peng}
+\date{\today}
+
+\newcommand{\prng}{\mathrm{prng}}
+\newcommand{\subeff}{\rightarrowtail}
+
+\newcommand{\Error}{\mathrm{Error}}
+\newcommand{\Ins}{\mathsf{Ins}}
+\newcommand{\Outs}{\mathsf{Outs}}
+
+\newcommand{\new}{\mathrm{new}}
+\newcommand{\del}{\mathrm{del}}
+\newcommand{\seed}{\mathrm{seed}}
+\newcommand{\rand}{\mathrm{rand}}
+
+\newcommand{\efinput}{\mathrm{input}}
+\newcommand{\efoutput}{\mathrm{output}}
+
+\newcommand{\efalloc}{\mathrm{alloc}}
+\newcommand{\efdealloc}{\mathrm{dealloc}}
+\newcommand{\efread}{\mathrm{read}}
+\newcommand{\efwrite}{\mathrm{write}}
+
+\newcommand{\To}{\implies}
+\newcommand{\redu}{\mapsto}
+\newcommand{\redus}{\redu^\ast}
+\newcommand{\Redu}{\rightsquigarrow}
+\newcommand{\Redus}{\Redu^\ast}
+\newcommand{\easgn}{\;\syn{\mathrel{:=}}\;}
+
+\newcommand{\OFE}{\mathbf{OFE}}
+\newcommand{\COFE}{\mathbf{COFE}}
+
+\newcommand{\inl}{\mathrm{inl}}
+\newcommand{\inr}{\mathrm{inr}}
+
+\newcommand{\hasstate}{\textsf{has\_state}}
+
+\newcommand{\IT}{\mathrm{IT}}
+\newcommand{\gRet}{\mathrm{Ret}}
+\newcommand{\gErr}{\mathrm{Err}}
+\newcommand{\gTau}{\mathrm{Tau}}
+\newcommand{\gVis}{\mathrm{Vis}}
+\newcommand{\gFun}{\mathrm{Fun}}
+\newcommand{\Tick}{\mathrm{Tick}}
+\DeclareMathOperator*{\Next}{\mathrm{next}}
+\newcommand{\getret}{\mathrm{get\_ret}}
+\newcommand{\getfun}{\mathrm{get\_fun}}
+\newcommand{\getval}{\mathrm{get\_val}}
+\newcommand{\cbnap}{\bullet_{\text{cbn}}}
+\newcommand{\cbvap}{\bullet_{\text{cbv}}}
+\newcommand{\gnatop}[1]{\mathrm{NatOp}_{#1}}
+\newcommand{\gif}{\mathrm{If}}
+\newcommand{\gwhile}{\mathrm{While}}
+
+\newcommand{\out}{\mathrm{read}}
+\newcommand{\upd}{\mathrm{update}}
+\newcommand{\knownprng}{\textsf{known\_prng}}
+\newcommand{\hasprngs}{\textsf{has\_prngs}}
+\newcommand{\prngCtx}{\knowInv{\iota_\prng}{\exists \sigma.\; \hasstate(\sigma) * \hasprngs(\sigma)}}
+\newcommand{\heapCtx}{\knowInv{\iota_h}{\exists \sigma_h.\; \mathrm{has\_heap}(\sigma_h)}}
+\newcommand{\LitV}{\mathrm{LitV}}
+\newcommand{\LitPrng}{\mathrm{LitPrng}}
+\newcommand{\safety}{\mathrm{s}}
+\newcommand{\Excl}{\operatorname{Excl}}
+\newcommand{\AuthFull}{\operatorname{\bullet}\;}
+\newcommand{\AuthFrag}{\operatorname{\circ}\;}
+\newcommand{\EmptyK}{\mathrm{EmptyK}}
+\newcommand{\recval}[3]{\syn{rec}\;#1(#2)=#3}
+\newcommand{\natopinterp}[3]{\llbracket #1 \rrbracket(#2,#3)}
+
+\newcommand{\IH}{\mathrm{IH}}
+
+\newcommand{\TODO}[1]{
+  \begin{center}
+    {\large \textbf{TODO}: \textcolor{red}{#1}}
+  \end{center}
+}
+
+\begin{document}
+\maketitle{}
+
+\section{Overview}
+
+During the semester of spring 2026, I conducted a project work titled \emph{Exploring Guarded Interaction Trees} under supervision of Prof.~Lars Birkedal. The primary objective was to understand how to develop denotational semantics for effectful programming languages in guarded interaction trees (GItrees).
+The project was carried out in four phases:
+\begin{enumerate}
+  \item In the preparation phase, I familiarized myself with writing formal proof using the Iris higher-order separation logic framework within the Rocq proof assistant.
+  \item Subsequently, I studied the research papers \cite{esop25git-callcc,popl24gitree} to learn the general theory of GItrees. I learned using GItrees to interpret programs involving higher-order effects.
+  \item Afterwards, I proposed and completed a case study on interpreting pseudo-randomness as an effect in GItrees. I designed a simple programming language with pseudo-random number generator functionality and developed a denotational semantics based on GItrees for proving safety and contextual equivalence.
+    The results have been mechanized in Rocq as an extension to the GItree Rocq formalization\footnote{The Rocq development is available at \url{https://github.com/logsem/gitrees/pull/6}}.
+  \item In the final stage, I experimented with modeling and reasoning about interactions between controller programs and physical devices, which is common in Internet of Things (IoT) applications.
+\end{enumerate}
+
+The current document summarizes my learning outcomes and preliminary exploration results. It is written for a three-fold purpose:
+(1) to provide a summary of my work for examination;
+(2) to articulate initial observations and insights for further discussion; and
+(3) to serve as a tutorial for people to get started on guarded interaction trees.\par
+
+\section{Backgrounds}
+
+We start by examining the theoretical and technical backgrounds of the project.
+We briefly review some important features of the Iris framework, the logical relations proof method, and the theory of guarded interaction trees.
+Pointers to beginner-friendly guided tutorial, technical treatments in full details, and classical literatures of historical importance will also be provided.
+
+\subsection{Iris: a framework of separation logics}
+
+Iris~\cite{iris3} is a framework for defining higher-order concurrent separation logics mechanized in the Rocq proof assistant.
+In this subsection, we recall some crucial features of Iris that enables us to build a program logic for guarded interaction trees.
+Our presentation are informal and over-simplified. Accurate description of Iris can be found in the ``Iris from the Ground Up'' paper~\cite{iris3} and the latest Iris technical reference~\cite{iris-appendix}.
+Readers who are unfamiliar with Iris may consult the Iris lecture notes~\cite{iris-lecture-notes} and the software-foundations-style Iris tutorial~\cite{iris-tutorial} to understand the fundamental concepts of concurrent separation logics and build familiarity on proof engineering with Iris proof mode inside Rocq.
+
+\subsubsection{Synthetic step-indexing}
+Step-indexing techniques were introduced to model general recursion and recursive types.
+Iris internalizes step-indexing via the later modality (\(\later\)) to avoid explicit step arithmetic and inequality side conditions.
+In iris, recursive propositions, notably the weakest preconditions, can be defined by guarded recursion, which is justified by a variant of the Banach's fixedpoint theorem.
+To prove a recursively defined proposition, one utilizes the L\"ob rule, which amounts to induction on the underlying step-index.
+\begin{mathpar}
+  \inferrule[\(\later\)-mono]{P\vdash Q}{\later P \vdash \later Q}
+  \and \inferrule[\(\later\)-mono]{P\vdash Q}{\later P \vdash \later Q}
+  \and \inferrule[\(\later\)-weak]{P\vdash Q}{P \vdash \later Q}
+  \and \inferrule[t-fix]{\typed{\Gamma,x:\tau}{t}{\tau} \\ \text{variable \(x\) can only appear in \(t\) under \(\later\)}}{\typed{\Gamma}{\mu x . t}{\tau}}
+  \and \inferrule[eq-fix]{ }{\typed{\Gamma}{\mu x .\; t = \subst{t}{x}{(\mu x .\; t)}}{\tau}}
+  \and \inferrule[L\"ob]{ }{\later P \Rightarrow P \vdash P}
+\end{mathpar}
+The idea of having a modality for recursion appears to be invented by Nakano~\cite{nakano-grec}, though the terminology and notations differ from that of Iris.
+The familiar was Birkedal et al.~\cite{birkedal2012first} proposed the synthetic step-indexing technique in its current form one can found in Iris.
+In their paper, the \emph{topos of trees}, i.e. the category of presheaves on the first infinite ordinal, was identified as a model of synthetic guarded domain theory (SGDT).
+The topos of tree gives rise to an intuitionistic higher-order logic with the later modality and a dependent type theory with a later operator.
+Following their work, many dependent type theories have been developed~\cite{birkedal2013intensional,bizjak2016guarded,birkedal2019guarded} to extend SGDT.
+Iris borrowed heavily from SGDT, even though the model of Iris is not based on the topos of trees or its generalizations.
+
+\subsubsection{Solving recursive domain equations}
+Self-referential structures, including the model of Iris itself, are defined as solutions of recursive domain equations in the realm of \emph{ordered family of equivalences} (OFEs).
+The category \(\OFE\) consists of \emph{ordered family of equivalences} and \emph{non-expansive} functions.
+Informally, an OFE \((T,{(\stackrel{n}{=}_T)}_n)\) is a set equipped with a family of step-indexed equivalence relations that become increasingly finer as the step become larger.
+A morphism \(f : (S,{(\stackrel{n}{=}_S)}_n) \stackrel{\mathrm{n.e.}}{\to} (T,{(\stackrel{n}{=}_T)}_n)\) is a set-theoretic function \(f : S \to T\) that respects the equivalences.
+That is, if \(x,y \in S\) are equivalent up to \(n\) steps, then \(f(x),f(y) \in T\) must be equivalent at least up to \(n\) steps.
+After defining the category \(\OFE\), one goes on to identify some important structures
+(1) a subcategory \(\COFE\) of \emph{complete OFEs} (COFEs),
+(2) a special class of morphisms known as the \emph{contractive} functions,
+and (3) \emph{locally contractive bifunctors} from the category of COFEs to itself.
+A recursive domain equation is formulated as the solution to \(G(T^{op}, T) \cong T\) where \(G : \COFE^{op} \times \COFE \to \COFE\) is a bifunctor.
+Under the conditions that \(G\) is locally contractive and that \(G(\mathbf{1}, \mathbf{1})\) is inhabited,
+one can apply the America and Rutten’s theorem to construct the unique solution to the equation and the fold/unfold isomorphism~\cite{iris3}.
+
+\subsubsection{Affine resource ownership and the frame rule}
+As a separation logic, Iris admits the weakening structural rule but limits the contraction rule to persistent propositions.
+That is, Iris propositions are generally non-duplicable but can be discarded freely.
+As a result, they are well-suited for modeling affine resource ownership, which is ubiquitous in programming languages.
+Moreover, reasoning and manipulation or resources in Iris are localized.
+For example, to update a specific heap cell, one do not need to consider the state of the entire heap.
+This informal and intuitive idea is captured by the frame rule and the \emph{frame-preserving updates} discipline, the enabler of modular proofs.
+The proof rules are justified by the semantic interpretation of Iris propositions as step-indexed subsets of resources that are
+(1) downwards-closed with respect to the step, meaning that \((r,n) \in \sem{P}\) implies that \((r,m) \in \sem{P}\) for all index \(m\) such that \(m < n\)
+and (2) upwards-closed with respect to resource composition, meaning that \((r,n) \in \sem{P}\) implies that \((r', n) \in \sem{P}\) if \(r' = r \cdot s\) for some resource \(s\).
+\begin{mathpar}
+  \inferrule[\(\sep\)-weak]{ }{P_1 \sep P_2 \vdash P_1}
+  \and \inferrule[\(\sep\)-intro]{P_1 \vdash Q_1 \\ P_2 \vdash Q_2}{P_1 \sep P_2 \vdash Q_1 \sep Q_2}
+  \and \inferrule[wp-mono]{\forall v .\; \Phi(v) \vdash \Psi(v)}{\wpre{e}{\Phi} \vdash \wpre{e}{\Psi}}
+  \and \inferrule[wp-frame]{ }{P \sep \wpre{e}{\Phi} \vdash \wpre{e}{P \sep \Phi}}
+\end{mathpar}
+
+\subsubsection{Invariants}
+An invariant is an Iris proposition that remains valid following its first establishment.
+Invariants are persistent logical resources, making it possible to be duplicated and shared across concurrent threads.
+Iris provides a special mechanism for accessing invariants in an atomic program step.
+After each atomic access, the invariant must be restored, reflecting the intuition that a shared resource may be safely accessed in an atomic operation provided that the operation preserves the resource's validity.
+\begin{mathpar}
+  \inferrule[persistent-elim]{ }{\persistently P \vdash P}
+  \and \inferrule[persistent-dup]{ }{\persistently P \vdash \persistently P \sep \persistently P}
+  \and \inferrule[inv-persistent]{ }{\knowInv{\iota}{P} \vdash \persistently \knowInv{\iota}{P}}
+  \and \inferrule[inv-alloc]{ }{\later P \vdash \pvs \knowInv{\iota}{P}}
+  \and \inferrule[wp-atomic]{\later P \vdash \wpre{e}{v .\; \later P \sep \Phi(v)} \\ \mathrm{atomic}(e)}{\knowInv{\iota}{P} \vdash \wpre{e}{\Phi}}
+\end{mathpar}
+\subsubsection{Custom resource algebras}
+Arguably the most powerful feature of Iris is the ability for users to extend the logic by defining new resource algebras.
+Iris uses ghost states over resource algebras to keep track of physical and logical states of programs to facilitate reasoning.
+As demonstrated in by Jung et al.~\cite{iris3}, many fundamental concepts in concurrent separation logic do not have to be introduced as primitives,
+instead they can be defined as ghost ownership of carefully crafted resource algebras.
+Instance of which includes the points-to predicate, and (surprisingly) invariants.
+\begin{mathpar}
+  \inferrule[valid-alloc]{a \in \mathcal{V}_M}{\TRUE \vdash \pvs \exists \gamma .\; \ownGhost{\gamma}{a}}
+  \and \inferrule[own-valid]{ }{\ownGhost{\gamma}{a} \vdash a \in \mathcal{V}_M}
+  \and \inferrule[own-op]{ }{\ownGhost{\gamma}{a} \sep \ownGhost{\gamma}{b} \dashv\!\vdash \ownGhost{\gamma}{a \cdot b}}
+  \and \inferrule[own-upd]{a \rightsquigarrow_M b}{\ownGhost{\gamma}{a} \dashv \pvs \ownGhost{\gamma}{b}}
+\end{mathpar}
+The Iris Rocq development ships with a bunch of reusable resource algebra combinators, e.g. option RA, product RA, finite partial map RA, authoritative RA, exclusive RA, helping to avoid defining RAs completely from scratch.
+
+
+\subsection{The logical relations proof method}
+
+Logical relations is a prominent method to proving semantic properties for typed programming languages.
+The flexible method can be used to establish soundness of a type system i.e. execution of well-typed programs never get stuck or result in an errorneous state or investigate specific programs, for example, proving a program safely encapsulate unsafe operations or proving contextual equivalence of two programs.
+Due to limited time for writing, we cannot include a full introduction to the proof methods in this report.
+Readers who do not have sufficient knowledge of logical relations can read Skorstengaard's excellent tutorial~\cite{skorstengaard2019logical}. The semantics course note by Dreyer et al.~\cite{dreyer2022semantics} is another excellent learning resource. It covers all of the techniques we will discuss in this subsection.
+
+\subsubsection{A brief history of logical relations}
+
+The logical relations method has been historically known as \emph{Tait's computability method} and \emph{Girard's reducibility candidates}, as it was pioneered by Tait and Girard.
+Tait~\cite{tait1967intensional} first employed the method to prove a normalization property of G\"odel's System T, which can be seen as the simply typed \(\lambda\)-calculus extended with natural numbers and primitive recursion. Girard~\cite{girard1972interpretation} extended the method to prove strong normalization for the second-order polymorphic \(\lambda\)-calculus, also known as System F. The primary novelty in Girard's proof was the interpretation of impredicative polymorphism by quantifying over \emph{candidats de r\'eductibilit\'e} instead of all syntactic types to prevent circularity.
+Subsequently, the power of logical relations was greatly expanded due to Reynolds's contribution.
+Reynolds~\cite{reynolds1983types} developed the notion of \emph{relational parametricity} for data abstractions and showed that polymorphic functions in System F are parametric, i.e., they treat inputs of different types uniformly, hence the name parametricity.
+
+While the proof method was immensely successful for pure and total languages, it was not easy to account for recursion and dynamic allocation, two ubiquitous yet complicated features in realistic programming languages. To treat the two aforementioned features, Kripke logical relations and step-indexing techniques were introduced.
+Coquand and Gallier~\cite{coquand1990proof}, inspired by the Kripke semantics of intuitionistic logic, interpreted typing contexts as frames and context extension as accessible worlds. Their interpretation yielded a simple proof of the strong normalization of the Calculus of Constructions (CoC). Later, O'Hearn and Pitts~\cite{o1993relational,pitts1996reasoning} adapted Kripke logical relations to model programming languages with local variables.
+The other addition, step-indexing, was originally introduced by Appel and McAllester~\cite{appel2001indexed} to build an operational semantics-based models for STLC extended with recursive types. They include step counters to introduces stratification in recursive structures. Their logical relations can be used to soundly prove safety and observational equivalence of programs without resorting to a full-scale traditional domain-theoretic treatment, which is advantageous in the context of foundational proof carrying code (PCC) systems.
+The techniques were eventually combined, giving rise to step-indexed Kripke logical relations (SKLR). Ahmed's PhD thesis~\cite{ahmed2004semantics} showed how to use SKLR to model feature-rich realistic programming languages.
+
+Despite being a scalable and powerful method, SKLR has some drawbacks. Proofs are often obscured and hard to mechanized due to the involvement of global state manipulations on the Kripke frame and tedious step-index arithmetics. These complications can be drastically reduced by defining logical relations in a suitable metatheory that can handle step-indexing and frame-preserving state manipulation abstractly.
+Iris is such a metatheory. Krebbers et al.~\cite{krebbers2017interactive,krebbers2018mosel} demonstrated how to define logical relations in Iris and carry out mostly straight-forward proofs in Iris Proof Mode.
+Compared to raw SKLRs, Iris-based logical relations proofs are often much more intuitive to understand on paper and easier to formalize in Rocq.
+
+\subsubsection{Logical relations in Iris}
+
+To illustrate logical relations in Iris, we give a proof sketch for the type soundness of System F with reference types and recursive types.
+We highlight how Iris features are used to simplify SKLRs.
+What we will demonstrate in this section largely follows from the case study in~\cite{iris-lecture-notes, jacm-logrel}.
+
+\textbf{Logical relations for closed terms}.
+A typing judgement has the form \(\typed{\Tenv; \Env}{\expr}{\typ}\), where \(\Tenv\) is the free type variables, \(\Env\) is the free term variables, and \(\tau\) is a valid type under \(\Tenv\).
+The term \(\expr\) is said to be closed when \(\Env = \bullet\) is empty, i.e., it involves no free term variable.
+We define the value relation \(\semVtype{\Tenv}{\typ}{\semenv} : \iVal \to \iProp_\persistently\) and the expression relation \(\semEtype{\Tenv}{\typ}{\semenv} : \iExpr \to \iProp_\persistently\) by induction on the type \(\typ\).
+Here \(\senv : \Tenv \to (\iVal \to \iProp_\persistently)\) is the interpretation of free type variables.
+The expression relation is defined as \(\semEtype{\Tenv}{\typ}{\semenv}(\expr) \eqdef \wpre{e}{\semVtype{\Tenv}{\typ}{\semenv}}\), stating that \(e\) is will not get stuck and may terminate as a value in \(\semVtype{\Tenv}{\typ}{\semenv}\).
+The value relation, capturing concerns the shape and hereditary semantic property of a value of the type in question, is define as follows:
+
+\begin{align*}
+  \semVtype{\Tenv}{\tvar}{\semenv}(\val) \eqdef{}
+  & \semenv(\tvar)(\val)\\
+  \semVtype{\Tenv}{\Tunit}{\semenv}(\val) \eqdef{}
+  & \val = ()\\
+  \semVtype{\Tenv}{\Tnat}{\semenv}(\val) \eqdef{}
+  & \exists n \in \nat.\; \val = n\\
+  \semVtype{\Tenv}{\Tbool}{\semenv}(\val) \eqdef{}
+  & \val \in \set{\vtrue, \vfalse}\\
+  \semVtype{\Tenv}{\typ_1 \times \typ_2}{\semenv}(\val) \eqdef{}
+  & \exists \val_1, \val_2.\; \val = (\val_1, \val_2) \sep
+  \semVtype{\Tenv}{\typ_1}{\semenv}(\val_1) \sep \semVtype{\Tenv}{\typ_2}{\semenv}(\val_2)\\
+  \semVtype{\Tenv}{\typ_1 + \typ_2}{\semenv}(\val) \eqdef{}
+  & \bigvee_{i\in \{1,2\}} \left( \exists \valB.\; \val = \vinj{i}{\valB} \sep \semVtype{\Tenv}{\typ_i}{\semenv}(\valB) \right) \\
+  \semVtype{\Tenv}{\typ \to \typ'}{\semenv}(\val) \eqdef{}
+  & \persistently \left(\forall \valB.\; \semVtype{\Tenv}{\typ}{\semenv}(\valB) \wand 
+  \semEtype{\Tenv}{\typ'}{\semenv}(\val~\valB) \right) \\
+  \semVtype{\Tenv}{\forall \tvar.\; \typ}{\semenv}(\val) \eqdef{}
+  & \persistently\left(\forall (\predB : \iVal \to \iProp_\persistently).\; \semEtype{\Tenv, \tvar}{\typ}{\semenv, \tvar \mapsto \predB}(\val~\langle\rangle)\right)\\
+  \semVtype{\Tenv}{\exists \tvar.\; \typ}{\semenv}(\val) \eqdef{}
+  & \persistently\left(\exists (\predB : \iVal \to \iProp_\persistently).\; \exists \valB .\; (\val = \pack\langle w \rangle) \sep \semEtype{\Tenv, \tvar}{\typ}{\semenv, \tvar \mapsto \predB}(\valB)\right)\\
+  \semVtype{\Tenv}{\Tmu \tvar.\; \typ}{\semenv}(\val) \eqdef{}
+  & \mu (\predB : \iVal \to \iProp_\persistently).\; \exists \valB.\; (\val = \fold \valB) \sep
+  \later \semVtype{\Tenv}{\typ}{\semenv, \tvar \mapsto \predB}(\valB) \\
+  \semVtype{\Tenv}{\Tref(\typ)}{\semenv}(\val) \eqdef{}
+  & \exists \loc.\; \val = \loc \sep
+  \knowInv{\namesp.\loc}{\exists \valB.\; \loc \mapsto \valB \sep
+  \semVtype{\Tenv}{\typ}{\semenv}(\valB)}
+\end{align*}
+
+We here remind the reader some technical details for ensuring the well-foundedness of the relations:
+
+\begin{enumerate}
+  \item By working in a separation logic with local resource manipulation, we no longer need to include explicit Kripke frames.
+  \item The expression relation is closed under head expansion. That is, \(e\redu e'\) and \(\semEtype{\Tenv}{\typ}{\semenv}(e')\) implies \(\semEtype{\Tenv}{\typ}{\semenv}(e)\).
+    This is one of the requirement for a relation to be a reducibility candidate.
+  \item Quantifying over reducibility candidates.
+    When interpreting \(\forall \tvar.\; \typ\) and \(\exists \tvar.\; \typ\), we did not directly quantify over of all syntactic types, which would introduces circularity.
+    Instead, we quantify over the type of value relations, i.e., \(\iVal \to \iProp_\persistently\).
+    We further note that impredicativity of Iris is crucial for the two clauses to be acceptable.
+  \item Recursion (at the object-level) as guarded recursion (at the meta-level).
+    We interpret a recursive type as a guarded fixed point, offloading step-indexing to Iris.
+  \item Environment-based Interpretation.
+    It is necessary that we interpret types relative to the interpretation of free type variables.
+    Carrying out syntactical substitution as soon as a type variable is instantiated is not a valid option.
+    This is because that the substitution result \(\subst{\typ}{\tvar}{\tvarB}\) is generally not structurally smaller than \(\tvar\),
+    meaning that one cannot use \(\semVtype{\Tenv}{\subst{\typ}{\tvar}{\tvarB}}{}\) to define \(\semVtype{\Tenv}{\forall \tvar . \typ}{}\).
+  \item Operational characterization of well-typed programs is absorbed into Hoare triples and/or weakest preconditions propositions.
+\end{enumerate}
+We further note that the relations are persistent. That is, they can be copied or discarded with no restriction at all.
+This is what we should expect since type system of the programming language admits unlimited weakening and contraction.\par
+% That is, programs like \(\lambda (x : \Tnat) . \lambda (y : \Tnat) . x\) and \(\lambda (f : \Tnat \to \Tnat \to \Tnat). \lambda (x : \Tnat) . f~x~x\) are well-typed.
+
+
+\textbf{Lifting to open terms}. We define the semantically well-typed relation by lifting the expression relation to open terms.
+Informally, the proposition \(\semtyped{\Tenv}{\Env}{\expr}{\typ}\) states that ``whenever a semantically well-formed closing substitution \(\env\) instantiating \(\Env\) is provided,
+the substitution result \(\env(\expr)\) is in the expression relation \(\semEtype{\Tenv}{\bullet}{\typ}{}\)''.
+To define this relation, we additionally introduce the closing substitution relation \(\semGtype{\Tenv}{\Env}{\semenv}{\env}\) to capture the property that \(\env\) instantiate all free variable in \(\Env\) with a closed values in the corresponding value relation.
+\begin{align*}
+  \semGtype{\Tenv}{\Env}{\semenv}(\env) \eqdef{} & \bigsep_{(\var\mapsto\val) \in \env} \semVtype{\Tenv}{\Env(\var)}{\semenv}(\val) \\
+  \semtyped{\Tenv}{\Env}{\expr}{\typ} \eqdef{} & \forall \env .\; \semGtype{\Tenv}{\Env}{\semenv}(\env) \wand \semEtype{\Tenv}{\typ}{\semenv}(\env(\expr))
+\end{align*}
+
+\textbf{Fundamental Lemma}. We prove that the semantic typing relation is compatible with the syntactic typing rules.
+For example, the typing rules for \(\lambda\)-abstraction and function application correspond to the following two lemmas
+\begin{mathpar}
+  % T-Abs (Lambda Abstraction)
+  \inferrule[T-Abs]
+  {\typed{\Xi ~|~ \Gamma, x : \tau_1}{e}{\tau_2}}
+  {\typed{\Xi ~|~ \Gamma}{\lambda x : \tau_1.\; e}{\tau_1 \to \tau_2}}
+  \and
+  % T-App (Function Application)
+  \inferrule [T-App]
+  {\typed{\Xi ~|~ \Gamma}{e_1}{\tau_1 \to \tau_2} \\ \typed{\Xi ~|~ \Gamma}{e_2}{\tau_1}}
+  {\typed{\Xi ~|~ \Gamma}{e_1~e_2}{\tau_2}}
+  \\
+  % T-Abs (Lambda Abstraction)
+  \inferrule[compat-Abs]
+  {\semtyped{\Xi}{\Gamma, x : \tau_1}{e}{\tau_2}}
+  {\semtyped{\Xi}{\Gamma}{\lambda x : \tau_1 .\; e}{\tau_1 \to \tau_2}}
+  \and
+  % T-App (Function Application)
+  \inferrule [compat-App]
+  {\semtyped{\Xi}{\Gamma}{e_1}{\tau_1 \to \tau_2} \\ \semtyped{\Xi}{\Gamma}{e_2}{\tau_1}}
+  {\semtyped{\Xi}{\Gamma}{e_1 \, e_2}{\tau_2}}
+\end{mathpar}
+
+By induction on the typing derivation, we can show that all syntactically well-typed term is semantically well-typed.
+This result is often being referred to as the fundamental lemma in the literature.
+\[
+  \forall \Xi,\Gamma,e,\tau .\;\typed{\Xi ~|~ \Gamma}{e}{\tau} \wand \semtyped{\Xi}{\Gamma}{e}{\tau}
+\]
+Specialize the result with \(\Xi = \bullet\) and \(\Gamma = \bullet\), we get to conclude that all well-typed closed programs are in the expression relation, which is a weakest precondition.\par
+
+\textbf{Adequacy}. The final step is to show that the logical relation implies the safety property in question.
+We have already derived that each well-typed programs have a weakest precondition governing their safety.
+The type soundness proof can be finished by invoking the adequacy of weakest preconditions and the Iris adequacy theorem.
+
+\subsection{Denotational semantics}
+
+Denotational semantics is an approach of defining a formal semantics of a programming language.
+While an operational semantics specifies the rules for executing programs, a denotational semantics characterizes what a program computes by defining a compositional map from the syntax to a domain of semantic objects.
+By interpreting a language in a domain that is inherently extensional, we can easily prove many equivalences that are challenging to prove in operational models.
+One of such classical example is congruence of contextual equivalence, i.e., to derive \(C[e_1] \cong C[e_2]\) given that \(e_1\cong e_2\) are equivalent terms.\par
+
+The relationship between a denotational model \(\sem{\cdot}\) and the operational semantics is traditionally characterized by the following properties:
+
+\begin{description}
+  \item[Soundness] \(e_1 \redu^* e_2 \implies \sem{e_1} = \sem{e_2}\)
+    The denotational semantics is stable under reductions defined by the operational semantics.
+  \item[Computational Adequacy] For base type expression \(e\) and value \(v\), \(\sem{e} = \sem{v} \implies e \Downarrow v\).
+    If the denotation of a term equals to that of a base type value, then the term computes to the value operationally.
+  \item[Full Abstraction] \(e_1 \cong_{ctx} e_2 \iff \sem{e_1} = \sem{e_2}\)
+    Contextual equivalence, which is defined by the operational semantics, and denotational equivalence, which is defined by equality in the semantic domain, coincide.
+\end{description}
+
+In this project, soundness and computational adequacy are our primary focus.
+The Stanford Encyclopedia of Philosophy has a page on game semantics~\cite{sep-games-abstraction} which contains a detailed discussing of the connection between denotational semantics and operational semantics
+We refer readers who are unfamiliar with (domain-theoretic) denotational semantics to the lecture notes by Pitts et al.~\cite{den-lectures} and the chapter on domain theory by Jung et al.~\cite{jung1996domains} in the \emph{handbook of logic in computer science} for a comprehensive treatment of classical domain theory.
+
+\subsection{Guarded Interaction Trees}
+
+To develop an adequate denotational semantics for a programming language, a semantic domain has to be decided first.
+Guarded interaction trees~\cite{popl24gitree} is essentially a domain of higher-order untyped effectful programs.
+It is well-suited for interpreting various languages with higher-order effects.
+Indeed, as demonstrated in by Frumin et al.~\cite{popl24gitree} guarded interaction trees can be used to investigate the semantics of interoperability.\par
+
+Guarded Interaction trees belongs to a long-standing tradition of modeling and reasoning about effectful programs monads to programs within total type theories, an approach pioneered by Moggi~\cite{moggi-monad}.
+Type theories generally rely on normalization and canonicity to ensure consistency, meaning that programs and proofs in a type theory have to be total. Consequently a large class of practical language features including partial functions, non-termination, input/output effects cannot be directly programmed. Many solutions aiming at overcoming this limitation have been proposed. Capretta~\cite{delaymonad} introduced the coinductive delay monad for potentially non-terminating computations. McBride's general monad~\cite{generalmonad} for modeling recursive function calls as request-response pairs. Pir\'og~\cite{res-monad} generalized the delay monad to coinductive resumption monad. Recently, Xia et al.~\cite{itrees} devised the interaction trees (ITrees), a semantic domain for first-order effectful programs.
+A major limitation of these works is the lack of primitive support for higher-order functions and higher-order effects. Leveraging the synthetic step-indexing technique, GItree is able to encode higher-order features natively.\par
+
+Starting form now, we implicitly work within the logic of Iris. When we say a type, we mean an OFE or a COFE. A function type should be understood as the space of non-expansive maps between two OFEs, which is itself an OFE.
+We now present a highly simplified overview of guarded interaction trees. While this introduction does not entirely match the GItree theory mechanized in Rocq, it provides enough foundational understanding to make the subsequent case studies accessible.
+
+\subsubsection{Effect Signature}
+
+The effects that a program can make use of is described by an \emph{effect signature} \((E,Ins, Outs)\).
+\(E\) is a finite set of available effects.
+For each effect \(i \in E\), \(\Ins_i, \Outs_i : \COFE \to \COFE\) are two functors specifying the expected input and output type of effect \(i\).
+
+For example, we can use the following effect signature to model I/O.
+
+\[
+  E = \{\efinput, \efoutput\}
+  \quad
+  \Ins_i(X) = \begin{cases}
+    \mathbf{1} & i = \efinput\\
+    \mathbb{N} & i = \efoutput\\
+  \end{cases}
+  \quad
+  \Outs_i(X) = \begin{cases}
+    \mathbb{N} & i = input\\
+    \mathbf{1} & i = output\\
+  \end{cases}
+\]
+
+The informal understanding of this signature is:
+
+\begin{enumerate}
+  \item A program can make use of the input effect and the output effect.
+  \item To invoke the input effect, a unit value has to be passed as argument.
+    When returning from the effect handler, a natural number value will be returned to the program.
+  \item To invoke the output effect, a natural number value has to be passed as argument.
+    When returning from the effect handler, a unit value will be returned to the program.
+\end{enumerate}
+
+The above signature is \emph{first-order} since \(Ins_i(X)\) and \(Outs_i(X)\) completely ignore \(X\).
+\(X\) will be eventually instantiated by the domain of (higher-order) effectful programs, enabling us to express higher-order effects, i.e., effects that can take programs as inputs and output programs.
+To illustrate higher-order effects, consider the following effect signature for (higher-order) store.
+
+\[
+  E = \{\efalloc, \efdealloc, \efread, \efwrite\}
+  \quad
+  \Ins_i(X) = \begin{cases}
+    X & i = \efalloc\\
+    \iLoc & i = \efdealloc\\
+    \iLoc & i = \efread\\
+    \iLoc \times X & i = \efwrite\\
+  \end{cases}
+  \quad
+  \Outs_i(X) = \begin{cases}
+    \iLoc & i = \efalloc\\
+    \mathbf{1} & i = \efdealloc\\
+    X & i = \efread\\
+    \mathbf{1} & i = \efwrite\\
+  \end{cases}
+\]
+
+We note that the effect \(\efread\) may return a runnable program and the effect \(\efwrite\) asks for a value in the domain of higher-order effectful program.
+
+\subsubsection{Guarded interaction trees as a fixed point}
+
+Fixing a type \(\Error\) of errors, a signature \(E\) of available effects, and a type \(A\) of base values,
+we seek a shallow embedding of the domain \(D\) of higher-order untyped effectful programs satisfying the following recursive domain equation:
+
+\[
+  D \cong \Error + A + \latert D + \latert [D \to D] + \sum_{i\in E} \left( \Ins_i(\latert D) \times [\Outs_i(\latert D) \to \latert D] \right)
+\]
+
+That is, a program in \(D\) can be:
+
+\begin{enumerate}
+  \item An error,
+  \item A base value,
+  \item A function that takes a program and returns a program, or
+  \item An invocation of an (higher-order) effect along with the data to be transferred to the effect handler and a continuation to be resumed upon returning from the effect handler.
+\end{enumerate}
+
+Notice that we reuse the function type of the metatheory to define higher-order function of the object language.
+As a result, function abstraction and application are not syntactic constructs in the object language.
+Further, function application is evaluated at the meta level.\par
+
+\(D\) cannot be defined inductively nor coinductively.
+We rephrase the mixed variance recursive domain equation as the fixed point of a bifunctor \(F : \COFE^{op} \times \COFE \to \COFE\), where
+
+\[
+  F(X,Y) = \Error + A + \latert Y + \latert [X \to Y] + \sum_{i\in E} \left( \Ins_i(\latert Y) \times [\Outs_i(\latert X) \to \latert Y] \right)
+\]
+
+It turns out that \(F\) is locally contractive and that \(F(\mathbf{1}, \mathbf{1})\) is non-empty.
+Therefore, the equation \(F(D,D) \cong D\) has a unique solution.
+We call the solution type guarded interaction trees, denoted by \(\IT_E(A)\).
+The recursive domain equation solver in Iris allows us to derive the fold/unfold isomorphism for \(\IT_E(A)\) and a recursive elimination principle,
+upon which the following definitions and equations can be derived:
+
+\begin{itemize}
+  \item When the base type and effect signature are of no significance or can be inferred from the context, we write \(\IT\) for \(\IT_E(A)\).
+  \item For \(\alpha \in \IT\), we write \(\Tick(\alpha) \eqdef \gTau(\Next \alpha)\).
+    We note that \(\Tick(\alpha)\) is the head normal form of \(\gTau\) GItree.
+  \item A collection of smart constructors for GItrees can be defined using the fold morphism.
+    \begin{align*}
+      \gRet &: A \to \IT \\
+      \gErr &: Error \to \IT \\
+      \gTau &: \latert \IT \to \IT \\
+      \gFun &: \latert (\IT \to \IT) \to \IT \\
+      \gVis &: \forall (op : I) (inputs : Ins_i(\latert \IT)) (callback : Outs_i(\latert \IT) \to \latert \IT) \to \IT
+    \end{align*}
+  \item We assume that the value type \(A\) is a coproduct. We write \(\gRet(b)\) for \(\gRet(\vinj{}{b})\) whenever \(b:B\) and \(\vinj{}{} : B\hookrightarrow A\).
+  \item We call a GItrees of the form \(\gRet(a)\) or \(\gFun(f)\) a value.
+    We use Greek letters with \(v\)-subscript, e.g., \(\alpha_v\), for GItree value meta variables.
+  \item A function \(\IT_E(A) \to \IT_E(A)\) is called a homomorphism if it satisfies the following equations:
+    \[
+      f(\gErr(e)) \equiv \gErr(e)
+      \quad
+      f(\Tick(\alpha)) \equiv \Tick(f(\alpha))
+      \quad
+      f(\gVis_i(x,k)) \equiv \gVis_i (x, \latert f \circ k)
+    \]
+    The identity function is a homomorphism and the composition of homomorphisms is homomorphism.
+  \item We can define three functions \(\getret\), \(\getfun\), and \(\getval\) satisfying the following equations.
+    \begin{align*}
+      \getret(f)(\gRet(n))        &\equiv f\;n
+        & \getret(f)(\gErr(e))    &\equiv \gErr(e) \\
+      \getret(f)(\Tick(\alpha))   &\equiv \Tick(\getret(f)(\alpha))
+        & \getret(f)(\gVis_i(x,k))&\equiv \gVis_i(x, \latert\circ\getret(f)\circ k) \\[6pt]
+      \getfun(g)(\gFun(h))        &\equiv g\;h
+        & \getfun(g)(\gErr(e))    &\equiv \gErr(e) \\
+      \getfun(g)(\Tick(\alpha))   &\equiv \Tick(\getfun(g)(\alpha))
+        & \getfun(g)(\gVis_i(x,k))&\equiv \gVis_i(x, \latert\circ\getfun(g)\circ k) \\[6pt]
+      \getval(h)(\gRet(n))        &\equiv h(\gRet(n))
+        & \getval(h)(\gFun(f))    &\equiv h(\gFun(f)) \\
+      \getval(h)(\Tick(\alpha))   &\equiv \Tick(\getval(h)(\alpha))
+        & \getval(h)(\gVis_i(x,k))&\equiv \gVis_i(x, \latert\circ\getval(h)\circ k)
+    \end{align*}
+  \item We can define the ``call-by-name'' function application combinator as well as the ``call-by-value'' version.
+    The combinators satisfy the following equations.
+    \begin{align*}
+      \gFun(\Next f)\cbnap\beta &\equiv f(\beta)
+        & \Tick(\alpha)\cbnap\beta &\equiv \Tick(\alpha\cbnap\beta) \\
+      \alpha_v\cbvap\beta          &\equiv \alpha_v\cbnap\beta
+        & \Tick(\alpha)\cbvap\beta_v &\equiv \Tick(\alpha\cbvap\beta_v) \\
+      \gErr(e)\cbnap\beta &\equiv \gErr(e)
+        & \gErr(e)\cbvap\beta_v    &\equiv \gErr(e)
+    \end{align*}
+    We note that the CBV function application combinator \(- \bullet - \) adopts a ``right-to-left'' evaluation order.
+  \item Conditional combinator \(\gif : \IT \to \IT \to \IT \to \IT\) satisfying:
+    \begin{align*}
+      \gif(\gRet(0))(\alpha)(\beta)   &\equiv \beta \\
+      \gif(\gRet(n+1))(\alpha)(\beta) &\equiv \alpha \\
+      \gif(\Tick(\gamma))(\alpha)(\beta) &\equiv \Tick(\gif(\gamma)(\alpha)(\beta)) \\
+      \gif(\gVis_i(x,k))(\alpha)(\beta) &\equiv
+         \gVis_i(x,\latert\circ\gif(-)(\alpha)(\beta)\circ k)
+    \end{align*}
+  \item Natural number operation combinator
+    \(\gnatop{\oplus} : \IT \to \IT \to \IT\) for
+    \(\oplus\in\{+,-,*\}\):
+    \begin{align*}
+      \gnatop{\oplus}(\gRet(n))(\gRet(m)) &\equiv \gRet({n}\oplus {m}) \\
+      \gnatop{\oplus}(\Tick(\gamma))(\beta)  &\equiv \Tick(\gnatop{\oplus}(\gamma)(\beta)) \\
+      \gnatop{\oplus}(\gVis_i(x,k))(\beta)   &\equiv
+         \gVis_i(x,\latert\circ\gnatop{\oplus}(-)(\beta)\circ k)
+    \end{align*}
+  \item While-loop combinator \(\gwhile : \IT \to \IT \to \IT\) defined via guarded recursion:
+    \[
+      \gwhile(\alpha)(\beta) \eqdef
+      \gif(\alpha)(\beta \cbvap \Tick(\gwhile(\alpha)(\beta)))(\gRet(()))
+    \]
+  \item \(\getfun(-,f)\), \(\cbnap(-,\beta)\), \(\alpha \cbvap -\), \(-\cbvap \beta_v\), \(\gnatop{\oplus}(-)(\beta)\) and \(\gnatop{\oplus}(\alpha_v)(-)\) are GItree homomorphisms.
+\end{itemize}
+
+Again, the combinators are metalevel definitions instead of being part of the language of guarded interaction trees.
+
+\subsubsection{Effect reifiers, GItree reductions, and program logics}
+
+Having defined the language of GItrees and some meta-level GItree combinators, we will define an operational semantics of GItrees that actually evaluate effect invocation by using \emph{effect reifiers}. A reifier specifies a semantics of an effect signature \((E,\Ins,\Outs)\) by defining the internal state of the effect \(\State(X)\) and the handler for each effect:
+
+\[
+  r : \prod_{i\in E} \left( \Ins_i(X) \times \State(X) \to \option{(\Outs_i(X) \times \State(X))} \right)
+\]
+The parameter \(X\) will be eventually instantiated with \(\latert \IT_E(A)\).
+
+One possible interpretation of the input/output effect is
+
+\begin{itemize}
+  \item The state is a pair of list, representing the input and the output tape, respectively. \(\State(X) = \mathbb{N}^\ast \times \mathbb{N}^\ast\).
+  \item The reifier for \(\efinput\):
+    \(
+      r_{\efinput}(l_0,l_1) = \begin{cases}
+        \None & l_0 = [] \\
+        \Some(x, (l_0',l_1)) & l_0 = x \col l_0'
+      \end{cases}
+    \)
+  \item The reifier for \(\efoutput\) is
+    \(
+      r_{\efoutput}(x,(l_0,l_1)) = \Some((), (l_0, x \col l_1))
+    \)
+\end{itemize}
+
+Given a reifier \(r\) for \(E\), we can define a small-step operational semantics of GItrees \(\IT_E(A)\).
+
+\begin{definition}[GItree reduction step]
+  We call a pair of a GItree program and a reifier state a \emph{GItree program configuration} \(\IT_E(A) \times \State(\latert \IT_E(A))\).
+  The GItree reduction step is a binary relation over configurations generated by the following two rules:
+  \begin{description}
+    \item[Tick step] \((\Tick(\alpha),\sigma) \Redu (\alpha,\sigma)\).
+    \item[Reify step] \((\gVis_i(x, k),\sigma) \Redu (\beta,\sigma)\) when \(r_i(x) = \Some(y,\sigma')\) and \(k\ y = \Next \beta\).
+  \end{description}
+\end{definition}
+
+The operational semantics of GItrees is defined as the reflexive and transitive closure of the reduction relation.\par
+
+A program logic for reasoning about the execution of guarded interaction trees can be established. The program logic for GItrees is centered around the weakest precondition \(\wpre{\alpha}{\Phi}\).
+
+\begin{mathpar}
+  \inferrule{\alpha : \IT_E(A) \\ \Phi : \IT^v_E(A) \to \iProp}{\wpre{\alpha}{\Phi} : \iProp}
+\end{mathpar}
+
+As usual, it is defined via a guarded fixed point, asserting that either \(\alpha\) is already a GItree value satisfying the post-condition \(\Phi\) or it steps to another GItree \(\beta\) for which \(\wpre{\beta}{\Phi}\) holds under suitable ghost state updates.
+
+\begin{mathpar}
+  \inferrule[wp-val]{\Phi(\alpha_v)}{\wpre{\alpha_v}{\Phi}}
+  \and
+  \inferrule[wp-tick]{\later\wpre{\alpha}{\Phi}}{\wpre{\Tick(\alpha)}{\Phi}}
+  \and
+  \inferrule[wp-hom]{\text{IT-Hom}(f) \\ \wpre{\alpha}{\alpha_v . \wpre{f(\alpha_v)}{\Phi}}}{\wpre{f(\alpha)}{\Phi}}
+  \and
+  \inferrule[wp-upd]{\pvs \wpre{\alpha}{\alpha_v . \pvs \Phi(\alpha_v)}}{\wpre{\alpha}{\Phi}}
+  \and
+  \inferrule[wp-mono]{\wpre{\alpha}{\Psi} \\ \forall \alpha_v . \Psi(\alpha_v)\wand\Phi(\alpha_v)}{\wpre{\alpha}{\Phi}}
+  \and
+  \inferrule[wp-reify]
+  {\hasstate(\sigma)\\
+    r_i(x,\sigma) = \Some(\beta,\sigma')\\
+  \later \left( \hasstate(\sigma') \wand \wpre{\beta}{\Phi} \right)}
+  {\wpre{\gVis_i(x, k)}{\Phi}}
+\end{mathpar}
+
+These proof rules should be mostly familiar. GItree homomorphisms can be viewed as evaluation contexts. The \textsf{WP-VAL} rule is the monadic return and the \textsf{WP-HOM} rule is the monadic bind.
+We note that the context-independent reification rule takes a premise \(\hasstate(\sigma)\), which asserts exclusive and complete ownership of the reifier state.
+However, it is often desirable to reason about effects with partial knowledge of the state. To illustrate this, consider the familiar \textsf{HEAPLANG-WP-LOAD} rule.
+
+\begin{mathpar}
+  \inferrule[HEAPLANG-WP-LOAD]{l\pointsto v}{\wpre{!l}{u . u = v}}
+\end{mathpar}
+
+The proof rule states that a partial view of the heap \(l\pointsto v\) is enough to conclude the safety of a load operation. To recover this kind of reasoning principles, one has to design an accompanying ghost theory, which will be exemplified later sections.\par
+
+Building on the adequacy theorem of Iris, a soundness theorem of the GItree program logic with respect to GItree reduction semantics can be proved:
+
+\begin{theorem}[GItree program logic soundness]
+  If \(\hasstate{\sigma}\proves\wpre{\alpha}{\Phi}\) is derivable, where \(\Phi\) is a pure Iris proposition, then for every \(\beta\) and \(\sigma'\) such that \((\alpha,\sigma)\Redus(\beta,\sigma')\) the following disjunctive statement holds.
+ 
+  \begin{itemize}
+    \item either \(\beta\) is a GItree value and \(\Phi(\beta)\) hold in the metalogic where Iris is defined;
+    \item or \((\beta,\sigma')\Redu(\beta_1,\sigma_1)\) for some \(\beta_1\) and \(\sigma_1\).
+  \end{itemize}
+\end{theorem}
+
+Informally, it states that \(\wpre{\alpha}{\Phi}\) ensures that \(\alpha\) is safe to run in the sense that it never gets stuck before reducing to a value. As a corollary \(\alpha\) never reduces to an erroneous GItree of the shape \(\gErr(\cdot)\), since the later is not a value and cannot be further reduced.
+
+\subsubsection{Combining effects}
+
+The domain of guarded interaction trees \(\IT_E(A)\) is parameterized on a single effect signature.
+To enable constructing and reasoning about programms that uses multiple effects, a mechanism for composing effect is required.\par
+
+Given two effects \((E_1,\Ins^1, \Outs^1)\) and \((E_2,\Ins^2,\Outs^2)\), one can combine them orthogonally. The combined signature is defined as \((E,\Ins,\Outs)\), where
+
+\begin{align*}
+  E & \eqdef E_1 + E_2 = \{(1,i) \mid i \in E_1\} \cup \{(2,j) \mid j \in E_2\}\\
+  \Ins_e(X) & \eqdef \begin{cases}
+    \Ins^1_i(X) & e = (1,i) \\
+    \Ins^2_j(X) & e = (2,j) \\
+  \end{cases}\\
+    \Outs_e(X) &\eqdef \begin{cases}
+      \Outs^1_i(X) & e = (1,i) \\
+      \Outs^2_j(X) & e = (2,j) \\
+    \end{cases}
+    \end{align*}
+
+A reifier for \(E\) can also be derived by combining a reifier \(r^1\) for \(E_1\) and a reifier \(r^2\) for \(E_2\).
+The state functor of the combined effect is given by \(\State(X) \eqdef \State^1(X) \times \State^2(X)\)
+
+\[
+  r_e(t,(\sigma_1, \sigma_2)) \eqdef \begin{cases}
+     \Some(t',(\sigma_1',\sigma_2)) & e = (1,i) \land \Some(t,\sigma_1')=r_i^1(t,\sigma_1) \\
+     \Some(t',(\sigma_1,\sigma_2')) & e = (2,j) \land \Some(t,\sigma_2')=r_j^2(t,\sigma_2) \\
+     \None & \text{otherwise}
+  \end{cases}
+\]
+
+Based on the this reifier, we can recover the \textsf{WP-REIFY} program logic proof rule.
+
+\begin{mathpar}
+  \inferrule[wp-reify-sub-1]
+  {\hasstate^1(\sigma_1)\\
+    r_i^1 (x,\sigma_1) = \Some(\beta,\sigma_1')\\
+  \later \left( \hasstate^1(\sigma_1') \wand \wpre{\beta}{\Phi} \right)}
+  {\wpre{\gVis_{(1,i)}(x, k)}{\Phi}}
+  \and \inferrule[wp-reify-sub-2]
+  {\hasstate^2(\sigma_2)\\
+    r_j^2 (x,\sigma_2) = \Some(\beta,\sigma_2')\\
+  \later \left( \hasstate^2(\sigma_2') \wand \wpre{\beta}{\Phi} \right)}
+  {\wpre{\gVis_{(2,j)}(x, k)}{\Phi}}
+\end{mathpar}
+
+We can easily generalize the orthogonal combination construction to mix arbitrary number of effects.
+This is lead to the notion of \emph{sub-effect}.
+An effect signature \((E, \Ins, \Outs)\) is said to be a sub-effect of another signature \((F, \Ins', \Outs')\), denoted by \(E\subeff F\),
+if there is an inclusion \(\epsilon : E \hookrightarrow F\), such that \(\Ins_i(X) \cong \Ins'_{\epsilon(i)}\) and \(\Outs_i(X) \cong \Outs'_{\epsilon(i)}\).\par
+
+Now that a mechanism for combining effects, we consider how to combine GItrees of different effect signatures.
+One may expect to derive a GItree embedding \(\IT_E(A) \to \IT_F(A)\) from \(E\subeff F\).
+However this quickly proves to be impossible.
+The recursive domain equation governing \(\IT\) is mixed-variant. Specifically, for the function case, we have \(\latert (\IT \to \IT) \hookrightarrow \IT\).
+It is unclear how to define a function of type \([\IT_F(A) \to \IT_F(A)]\) given a function of type \([\IT_E(A) \to \IT_E(A)]\).\par
+
+
+It turns out that one can systematically transform the code for defining \(\alpha \in \IT_E(A)\) into a definition of \(\alpha' \in \IT_F(A)\) when the inclusion \(E\subeff F\) is given.
+Such an approach is not modular since one often cannot foresee the larger effect signature \(F\) when programming in \(\IT_E(A)\).
+To recover modularity, we work with a general unknown \(F\) such that \(E\subeff F\).
+This amounts to transforming all definitions of type \(\IT_E(A)\) into dependent functions of type \(\forall F . (E\subeff F) \to \IT_F(A)\).
+To see why this small change enables modular composition, consider the following example.\\
+
+Given the following definitions:
+
+\begin{align*}
+  \alpha &: \forall F .\; (E_1\subeff F) \to \IT_F(A) \\
+  \beta &: \forall F .\; (E_2\subeff F) \to \IT_F(A) \\
+  R &: \forall F .\; (E_3\subeff F) \to \IT_F(A) \to \IT_F(A) \to \IT_F(A) \\
+\end{align*}
+
+Let \(F_0 = E_1 + (E_2 + E_3)\). We can specialize \(\alpha,\beta,R\) to obtain the following concrete GItrees:
+
+\begin{align*}
+  \alpha \langle F_0, \inl \rangle & : \IT_{F_0}(A) \\
+  \beta \langle F_0, \inr \circ \inl \rangle & : \IT_{F_0}(A) \\
+  R \langle F_0, \inr \circ \inr \rangle & : \IT_{F_0}(A) \to \IT_{F_0}(A) \to \IT_{F_0}(A) \\
+\end{align*}
+
+This allows us to apply \(\alpha\) and \(\beta\) to \(R\).
+We do not have to restrict ourselves to the concrete signature \(F_0\).
+For every \(F\) such that \(\epsilon : F_0\subeff F\), we can carry out the following specialization:
+
+\begin{align*}
+  \alpha \langle F, \epsilon \circ \inl \rangle & : \IT_{F}(A) \\
+  \beta \langle F, \epsilon \circ \inr \circ \inl \rangle & : \IT_{F}(A) \\
+  R \langle F, \epsilon \circ \inr \circ \inr \rangle & : \IT_{F}(A) \to \IT_{F}(A) \to \IT_{F}(A) \\
+\end{align*}
+
+Effective, we have defined:
+
+\begin{align*}
+  \alpha' &: \forall F .\; (F_0\subeff F) \to \IT_F(A) \\
+  \beta' &: \forall F .\; (F_0\subeff F) \to \IT_F(A) \\
+  R' &: \forall F .\; (F_0\subeff F) \to \IT_F(A) \to \IT_F(A) \to \IT_F(A) \\
+\end{align*}
+
+\section{Case Study: pseudo-randomness as an effect}
+
+We demonstrate how to model pseudo-randomness in GItrees in a straight-forward approach,
+upon which we develop a denotational semantics for a programming languages with built-in support for pseudo-random number generators (PRNGs).\par
+A PRNG is a stateful deterministic algorithm for creating a stream of seemingly random data from a seed. Formally, a PRNG is a tuple \((S,T,f,g)\), where \(S\) is the state space, \(T\) is the output space, \(f : S \to S\) is the state update function and \(g : S \to T\) is the read out function. A generator with seed \(s_0 \in S\) generates the sequence \(t_n = g(s_n)\) on the \(n\)-th invocation, where \(s_n = f(s_{n-1})\).
+Compared to true randomness, which is typically implemented by measuring physically unpredictable phenomenon, pseudo-randomness is considerably easier to implement, less costly, and more robust to the physical environment. More importantly, true randomness have quite limited throughput due to the time needed for performing measurements. PRNG does not create such limit. In practice, PRNG are often used to implement to efficient randomized algorithms and tend to have satisfying performance in non-adversarial settings.\par
+The section is organized in a step-by-step manner in the hope that it can be read as a recipe for readers who want to model an effect that is not already available in the GItree formalization or build a denotational semantics for studying an effectful language.
+
+\subsection{A language with the PRNG effect}
+
+We start by defining a programming language featuring the PRNG effect \(\lambda_\prng\).
+For simplicity, the state space and output space of generators in \(\lambda_\prng\) are natural numbers and the semantics of \(\lambda_\prng\) is parameterized over a PRNG \((\mathbb{N},\mathbb{N},\upd,\out)\).
+
+\begin{definition}[\(\lambda_{\prng}\) raw syntax]
+  \[
+  \begin{array}{rcl}
+    \text{Types} &\tau &\bnfdef \tunit \ALT \tnat \ALT \syn{prng} \ALT \tau \to \tau \\[4pt]
+    \text{Values} &v   &\bnfdef \vunit \ALT n \ALT \ell \ALT \recval{f}{x}{e} \\[4pt]
+    \text{Exprs}  &e   &\bnfdef v \ALT x \ALT e_1\;e_2 \ALT e_1 \oplus e_2 \ALT \syn{if}\;e_0\;\syn{then}\;e_1\;\syn{else}\;e_2 \\
+                  &&\ALT \kw{NewPrng} \ALT \kw{DelPrng}\;e \ALT \kw{Seed}\;e_1\;e_2 \ALT \kw{Rand}\;e \\[4pt]
+    \text{Ctxs} &K &\bnfdef \ctxhole \ALT K\;e \ALT v\;K \ALT K \oplus e \ALT v \oplus K \ALT \syn{if}\;K\;\syn{then}\;e_1\;\syn{else}\;e_2 \\
+                &&\ALT \kw{DelPrng}\;K \ALT \kw{Seed}\;K\;e \ALT \kw{Seed}\;v\;K \ALT \kw{Rand}\;K
+  \end{array}
+  \]
+  where \(n\in\tnat\), \(\ell\in\iLoc\) and \(\oplus\in\{\texttt{+},\texttt{-},\texttt{*}\}\).
+\end{definition}
+
+\begin{definition}[\(\lambda_{\prng}\) small-step operational semantics]
+  The PRNG state \(\sigma \in \iLoc \fpfn \mathbb{N}\) is a finite map from locations to natural numbers, keeping track of the current PRNG internal state value.
+  A \emph{\(\lambda_\prng\) program configuration} consists of the remaining program to be executed and the current state.
+
+  Pure head reductions:
+  \begin{mathpar}
+    \inferrule{ }{((\recval{f}{x}{e})\;v,\sigma) \redu (e[(\recval{f}{x}{e})/f,\;v/x],\sigma)}
+    \and
+    \inferrule{n > 0}{(\syn{if}\;n\;\syn{then}\;e_1\;\syn{else}\;e_2,\sigma) \redu (e_1,\sigma)}
+    \and
+    \inferrule{ }{(\syn{if}\;0\;\syn{then}\;e_1\;\syn{else}\;e_2,\sigma) \redu (e_2,\sigma)}
+    \and
+    \inferrule{v_1 \oplus v_2 = v_3}{(v_1 \oplus v_2,\sigma) \redu (v_3,\sigma)}
+  \end{mathpar}
+  PRNG-related head reductions:
+  \begin{mathpar}
+    \inferrule{\ell\notin\dom(\sigma)}{(\kw{NewPrng},\sigma) \redu (\ell,\;\sigma[\ell\easgn 0])}
+    \and
+    \inferrule{\sigma(\ell)=n}{(\kw{Rand}\;\ell,\sigma) \redu (\out(n),\;\sigma[\ell\easgn\upd(n)])}
+    \and
+    \inferrule{\sigma(\ell)=n}{(\kw{Seed}\;\ell\;m,\sigma) \redu (\vunit,\;\sigma[\ell \easgn m])}
+    \and
+    \inferrule{ }{(\kw{DelPrng}\;\ell,\sigma) \redu (\vunit,\;\sigma\setminus\ell)}
+  \end{mathpar}
+  Lifting to arbitrary redexes with context-filling reduction rule 
+  \begin{mathpar}
+    \inferrule{(e,\sigma)\redu(e',\sigma')}{(K[e],\sigma)\redu(K[e'],\sigma')}
+  \end{mathpar}
+\end{definition}
+
+We note that generator values are first-class citizen of the \(\lambda_\prng\) language, which can be freely copied, discarded, passed as arguments or returned from functions.
+Indeed, a generator is duplicated when being pass to a function that uses its argument multiple times.
+On top of this, copies of a generator value share the underlying generator state, making it impossible to predict the stream to be generated by a generator by observing its copies.
+More specifically, suppose that \(g'\) is created by duplicating \(g\) and \(\kw{Rand}\;g\) gives \(n\), the expression \(\kw{Rand}\;g'\) is not guaranteed to return \(n\).
+
+\begin{definition}[\(\lambda_{\prng}\) type system]
+  For the pure part:
+  \begin{mathpar}
+    \inferrule{ }{\typed{\Gamma,x:\type}{x}{\type}}
+    \and\inferrule{ }{\typed{\Gamma}{\vunit}{\tunit}}
+    \and\inferrule{ }{\typed{\Gamma}{n}{\tnat}}
+    \and\inferrule{\typed{\Gamma,f:\type_1\to\type_2,\;x:\type_1}{e}{\type_2}}
+                  {\typed{\Gamma}{\recval{f}{x}{e}}{\type_1\to\type_2}}
+    \and\inferrule{\typed{\Gamma}{e_1}{\type_1\to\type_2} \\
+                   \typed{\Gamma}{e_2}{\type_1}}
+                  {\typed{\Gamma}{e_1\;e_2}{\type_2}}
+    \and\inferrule{\typed{\Gamma}{e_1}{\tnat} \\
+                   \typed{\Gamma}{e_2}{\tnat}}
+                  {\typed{\Gamma}{e_1\oplus e_2}{\tnat}}
+    \and\inferrule{\typed{\Gamma}{e_0}{\tnat} \\
+                   \typed{\Gamma}{e_1}{\tau} \\
+                   \typed{\Gamma}{e_2}{\tau}}
+                  {\typed{\Gamma}{\syn{if}\;e_0\;\syn{then}\;e_1\;\syn{else}\;e_2}{\tau}}
+  \end{mathpar}
+  For the effectful part:
+  \begin{mathpar}
+    \inferrule{ }{\typed{\Gamma}{\kw{NewPrng}}{\syn{prng}}}
+    \and\inferrule{\typed{\Gamma}{e}{\syn{prng}}}
+                  {\typed{\Gamma}{\kw{Rand}\;e}{\tnat}}
+    \and\inferrule{\typed{\Gamma}{e_l}{\syn{prng}} \\
+                   \typed{\Gamma}{e_s}{\tnat}}
+                  {\typed{\Gamma}{\kw{Seed}\;e_l\;e_s}{\tunit}}
+  \end{mathpar}
+\end{definition}
+The type rules is mostly standardly and upholds the weakening and substitution lemma. We note that no typing rule is given for \(\kw{DelPrng}\) -- deleting a potentially shared generator is unsound, so the constructor remains unused in well-typed programs. While it is possible to give a proper typing rule for \(\kw{DelPrng}\) by adopting a linear type discpline, we would like to not overcomplicate \(\lambda_\prng\).
+
+\subsection{Modeling the PRNG effect in guarded interaction trees}
+
+Here, we following the recipe in \cite{esop25git-callcc} to model the PRNG effects.
+
+\emph{Step 1: Identify the Key Operations.} The PRNG effect involves three key operations \texttt{new}, \texttt{delete}, \texttt{seed}, and \texttt{rand}.
+
+\begin{itemize}
+  \item Creation of a generator: Every \(\kw{NewPrng}\) call create a new generator, for which we have to keep track of its internal state.
+  \item Deletion of a generator: When \(\kw{DelPrng}\; g\) is called, we have to find the generator corresponding to the value \(g\) and remove it.
+  \item Seeding of a generator: When \(\kw{Seed}\; g\; s\) is executed, we have to find the generator corresponding to the value \(g\) and update its internal state.
+  \item Generation of a random number: Each time \(\kw{Rand}\; g\) is executed, we have to find the underlying generator, read out a number, and update its state.
+\end{itemize}
+
+\emph{Step 2: Design the State.} To implement the PRNG effect, we maintain the internal state of all generator created so far. Furthermore, each generator should have a unique identifier to enable efficient lookup and sharing. We use the \texttt{gmap} data structure to store a finite map from locations to natural numbers as the state of the PRNG effect, and define the state functor as \(State(X) \eqdef \iLoc \fpfn \mathbb{N}\).
+
+\emph{Step 3: Define the Effect Signatures.}
+
+\begin{itemize}
+  \item Effects: \(E = (\new, \del, \seed, \rand)\)
+  \item Creation effect: \(Ins_{\new}(X) = \mathbf{1}\) and \(Outs_{\new}(X) = \iLoc\).
+    To create a new generator, no data have to be provided. A location, where the generator state is kept, will be returned.
+  \item Deletion effect: \(Ins_{\del}(X) = \iLoc\) and \(Outs_{\del} = \mathbf{1}\).
+    To delete a generator, the location of the generator state has to be provided. No meaningful data will be returned.
+  \item Seeding effect: \(Ins_{\seed}(X) = \iLoc \times \mathbb{N}\) and \(Outs_{\seed}(X) = \mathbf{1}\).
+    To seed a generator, the state location and the new random seed have to be provided. No meaningful data will be returned.
+  \item Generation effect: \(Ins_{\rand}(X) = \iLoc\) and \(Outs_{\rand}(X) = \mathbb{N}\).
+    To get a random number, location to a generator state has to be provided. A number read out from the random state will be returned.
+\end{itemize}
+
+\emph{Step 4: Implement the Reifiers.} The reification of the PRNG effects is straight-forward.
+Recall that the reifier \(r_e\) of an effect \(e \in E\) ought to be a function \(Ins_{e}(X) \times State(X) \to \option{( Outs_{e}(X) \times State(X) )} \)
+
+\begin{align*}
+  r_{\new}((), \sigma) & \eqdef \Some(l, \sigma[l\mapsto 0]) \text{where \(l \notin \dom(\sigma)\) is a fresh location}\\
+  r_{\del}(l,\sigma) & \eqdef \begin{cases}
+    \Some((), \mathrm{delete}(\sigma,l)) & l \in \dom(\sigma)\\
+    \None & l \notin \dom(\sigma)\\
+  \end{cases} \\
+    r_{\seed}((l,s), \sigma) & \eqdef \begin{cases}
+      \Some((), \sigma[l\mapsto s]) & l \in \dom(\sigma)\\
+      \None & l \notin \dom(\sigma)\\
+    \end{cases}\\
+      r_{\rand}(l,\sigma) & \eqdef \begin{cases}
+        \Some(\out(n), \sigma[l\mapsto \upd(n)]) & l \in \dom(\sigma) \land \sigma(l) = n\\
+        \None & l \notin \dom(\sigma)\\
+      \end{cases}
+      \end{align*}
+
+\emph{Step 5: Define Convenient Wrapper Functions.} A GItree can call an effects by using the \texttt{Vis} smart constructor. However, directly working with such a low-level construction is cumbersome and error prone.
+To make our programming and reasoning about the PRNG effect easier, we provide some wrappers around the \(\gVis\) constructor:
+
+\begin{itemize}
+  \item \(\mathrm{PRNG\_NEW}(k : \iLoc \to X) \eqdef \gVis_{\new}((), \Next \circ k)\)
+  \item \(\mathrm{PRNG\_DEL\_k}(l : \iLoc, k : \mathbf{1} \to X) \eqdef \gVis_{\del}(l, \Next \circ k)\)
+    and \(\mathrm{PRNG\_DEL}(l,n) \eqdef \mathrm{PRNG\_DEL\_k}(l, n, \gRet())\)
+  \item \(\mathrm{PRNG\_SEED\_k}(l : \iLoc, n : \mathbb{N}, k: \mathbf{1} \to X) \eqdef \gVis_{\new}((l,n), \Next \circ k)\)
+    and \(\mathrm{PRNG\_SEED}(l,n) \eqdef \mathrm{PRNG\_SEED\_k}(l, n, \gRet())\)
+  \item \(\mathrm{PRNG\_GEN\_k}(l : \iLoc, k: \mathbb{N} \to X) \eqdef \gVis_{\rand}(l, \Next \circ k)\) and \(\mathrm{PRNG\_GEN}(l) \eqdef \mathrm{PRNG\_GEN\_k}(l, \gRet)\)
+\end{itemize}
+
+Equipped with these high-level programming support, one can easily encode randomized algorithms in GItrees.
+Consider the following GItree which uses the PRNG effect and the higher-order store effect:
+
+\[
+\begin{array}{rcl}
+\mathrm{neg\_bool}(\alpha_n) & \eqdef & \gnatop{\mathrm{sub}}(\gRet(1))(\alpha_n)\\
+\syn{las\_vegas}(sd, init, test)
+  & \eqdef &
+    \begin{array}[t]{l}
+      \mathrm{PRNG\_NEW}\;(\lambda r. \\
+      \qquad \mathrm{ALLOC}\;(\gRet(init))\;(\lambda s. \\
+      \qquad\quad \mathrm{PRNG\_SEED}\;r\;sd; \\
+      \qquad\quad \gwhile\;(\mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s)) \\
+      \qquad\qquad (\mathrm{Let}\;x = \mathrm{PRNG\_GEN}\;r\ \mathrm{in}\ \mathrm{WRITE}\;s\;x) \\
+      \qquad\quad \mathrm{READ}\;s))
+    \end{array}
+\end{array}
+\]
+
+% TODO: rework this part
+This GItree encodes a Las Vegas algorithm: given an initial guess
+\(init \in \mathbb{N}\), a seed \(sd \in \mathbb{N}\), and a test
+predicate \(test : \mathbb{N} \to \mathbf{2}\) encoded as a GItree,
+it creates a generator \(r\), seeds it with \(sd\), allocates a store
+cell holding \(init\), and loops: while \(test\) fails on the current
+value, it samples a fresh random number from \(r\) and stores it.
+When \(test\) succeeds, the loop exits and returns the satisfying value.
+The macro \(\mathrm{LET}\;e_1\;e_2\) denotes \(\eapp{(\lambda\cdot\;e_2)}{e_1}\)
+and \(\mathrm{SEQ}\;e_1\;e_2\) denotes \(e_1 \cbvap (\lambda\cdot\; e_2)\).
+
+\emph{Step 6: Derive Program Logic Rules.} While the reifier endows a semantics for the PRNG effect, it is hard to directly prove properties of GItrees involving the PRNG effect. We will derive some weakest precondition proof rules to facilitate modular reasoning of PRNG effects.\par
+
+As we have suggested before, we need to create a ghost theory to enable reasoning about effect reification with partial view on the state.
+We start by pondering the right notion of a partial view for our purpose.
+Given the state functor definition \(State(X) \eqdef \iLoc \fpfn \mathbb{N}\), it is natural to reuse the ``points-to'' predicate \(\ell\pointsto n\), which gives exclusive ownership of the store cell at location \(l\) and the knowledge that the location is valid.
+However, we quickly realize that this notion of partial view is too strong for the following two reasons.
+\begin{enumerate}
+  \item Actual generator states should not be exposed:
+    We typically expect to prove properties of programs with PRNG effects without knowing the exact generator state and the pseudo-random sequence to be generated.
+    This is because PRNG is often used as a practical alternative to true randomness and non-determinism.
+    Take the Las Vegas GItree as an example, the proper correctness specification of that program should not involve the state of generators.
+  \item The partial view Iris proposition should be a duplicable resource:
+    We will eventually interpret \(\lambda_\prng\) programs as GItrees with PRNG effects.
+    In the programming language, copies of a generator values of type \(\syn{prng}\) can be freely created and discarded,
+    and it should be always safe to use a copy.
+\end{enumerate}
+Motivated by these analysis, we weaken the ``points-to'' predicate \(\ell\pointsto n\) to the ``valid generator'' predicate \(\knownprng(\ell)\) to represent the knowledge that a valid generator state is being stored at the location \(\ell\).
+Before we present the resource algebra constructions to realize the ghost theory, let's reflect on what reasoning principles our ghost theory should support.
+
+\begin{mathpar}
+  \inferrule{\ell : \iLoc}{\knownprng(\ell) : \iProp}
+  \and \inferrule{\sigma : \iLoc \fpfn \mathbb{N}}{\hasprngs(\sigma) : \iProp}
+  \\
+  \inferrule[gh-partial-dup]{ }{\knownprng(\ell)\vdash\knownprng(\ell) \star \knownprng(\ell)}
+  \and \inferrule[gh-full-nodup]{ }{\hasprngs(\sigma)\star \hasprngs(\sigma) \vdash \FALSE}
+  \\
+  \inferrule[gh-store-alloc]{\sigma : \iLoc \fpfn \mathbb{N}}{\vdash \pvs \hasprngs(\sigma)}
+  \and \inferrule[gh-loc-alloc]{\ell \notin \dom(\sigma) \\ n \in \mathbb{N}}{\hasprngs(\sigma) \vdash \pvs (\hasprngs(\sigma[l\easgn n])\star \knownprng(l))}
+  \and \inferrule[gh-get]{ }{\hasprngs(\sigma) \star \knownprng(\ell)\vdash \hasprngs(\sigma) \star \exists n \in \mathbb{N}\;.\;\sigma(\ell) = n}
+  \and \inferrule[gh-set]{n \in \mathbb{N}}{\hasprngs(\sigma) \star \knownprng(\ell)\vdash \pvs \hasprngs(\sigma[l\easgn n])}
+\end{mathpar}
+
+To implement this ghost theory, we use an exclusive resource algebra \(\textsf{exclR}(\textsf{gmapUR}(\iLoc,\mathbb{N}))\) to track the actual store and an authoritative resource algebra \(\textsf{authR}(\textsf{gsetR}(\iLoc))\) to track the set of valid locations in the store.
+Let \(\gamma_K\) and \(\gamma_V\) be two fresh ghost names, we define
+
+\[
+  \textsf{has\_prngs}(\sigma) \eqdef \ownGhost{\gamma_V}{\Excl(\sigma)} * \ownGhost{\gamma_K}{\AuthFull\dom(\sigma)}
+  \qquad
+  \knownprng(l) \eqdef \ownGhost{\gamma_K}{\AuthFrag(\{l\})}
+\]
+All the proof rules can be justified by using the properties of the constituent CMRAs.
+We note that our construction makes the partial view resource \(\knownprng(\ell)\) persistent and hence duplicable.
+
+Building on top of this ghost theory, program logic capturing the intuition of safety of PRNG effects can be derived from the \(\textsf{WP-REIFY}\) rule.
+
+\begin{mathpar}
+  \inferrule[wp-prng-new]
+  {\prngCtx\\
+  \later\later(\forall \ell.\; \knownprng(\ell) \wand \wpre{k\;\ell}{\Phi})}
+  {\wpre{\mathrm{PRNG\_NEW}\;k}{\Phi}}
+  \and
+  \inferrule[wp-prng-gen]
+  {\prngCtx\\
+    \later \knownprng(\ell)\\
+    \later\later \forall n.\; \Phi(\gRet(n))}
+  {\wpre{\mathrm{PRNG\_GEN}\;\ell}{\Phi}}
+  \and
+  \inferrule[wp-prng-seed]
+  {\prngCtx\\
+  \later \knownprng(\ell)\\
+  \later\later\Phi(\gRet(()))}
+  {\wpre{\mathrm{PRNG\_SEED}\;\ell\;m}{\Phi}}
+\end{mathpar}
+
+The \(\textsf{WP-PRNG-NEW}\) rule says that \({\mathrm{PRNG\_NEW}\;k}\) is safe if the \(k\) can continue safely with a location \(\ell\) regardless of the actual value of \(\ell\) and the initial state at that location.
+The \(\textsf{WP-PRNG-GEN}\) rule says that to safely execute \({\mathrm{PRNG\_GEN}\;\ell}\), \(\ell\) should be valid and no assumption of the generated number can be made.
+The \(\textsf{WP-PRNG-SEED}\) rule says that executing \({\mathrm{PRNG\_SEED}\;\ell}\) is always safe, provided that \(\ell\) is a valid generator.
+No rule for \({\mathrm{PRNG\_DEL}}\) can be derived. This is because \(\knownprng(\ell)\) is persistent, which implies \(l \in \dom(\sigma)\) can never be invalidated.\par
+
+Another set of rules with the explicit ownership of the full state threaded through is also provided. These rules are used to related the execution of a GItree with PRNG effect and a \(\lambda_\prng\) program.
+
+\begin{mathpar}
+  \inferrule[wp-prng-new']
+  {\hasstate(\sigma)\\
+    \hasprngs(\sigma)\\
+    l = \operatorname{fresh}(\dom(\sigma))\\
+  \later\later(\hasstate(\sigma[l\easgn 0]) \star \hasprngs(\sigma[l\easgn 0])
+  \wand \knownprng(\ell) \wand \wpre{k\;\ell}{\Phi})}
+  {\wpre{\mathrm{PRNG\_NEW}\;k}{\Phi}}
+  \and
+  \inferrule[wp-prng-gen']
+  {\hasstate(\sigma)\\
+    \hasprngs(\sigma)\\
+    \knownprng(\ell)\\
+    \sigma(\ell) = n\\
+  \later\later(\hasstate(\sigma[l\easgn \upd(n)]) \star \hasprngs(\sigma[l\easgn \upd(n)])
+  \wand \knownprng(\ell) \wand \Phi(\gRet(\out(n)))}
+  {\wpre{\mathrm{PRNG\_GEN}\;\ell}{\Phi}}
+  \and
+  \inferrule[wp-prng-seed']
+  {\hasstate(\sigma)\\
+    \hasprngs(\sigma)\\
+    \knownprng(\ell)\\
+  \later\later(\hasstate(\sigma[l\easgn m]) \star \hasprngs(\sigma[l\easgn m])
+  \wand \knownprng(\ell) \wand \Phi(\gRet(()))}
+  {\wpre{\mathrm{PRNG\_SEED}\;\ell\;m}{\Phi}}
+\end{mathpar}
+
+
+To conclude this part, we showcase a proof that the Las Vegas GItree program always finds a valid solution upon termination.  The Coq mechanization of this proof is in \texttt{prng\_examples.v}.
+
+\begin{theorem}[Partial correctness of Las Vegas]
+  Let \(f : \mathbb{N} \to \mathbf{2}\) be a predicate, \(test\) a GItree
+  that decides \(f\) (i.e., \(\forall n.\; test \cbvap \gRet(n)\) reduces to
+  \(\gRet(1)\) if \(f(n)\) holds and \(\gRet(0)\) otherwise), and
+  \(sd, init \in \mathbb{N}\).  Then
+  \[
+  \heapCtx \star \prngCtx \proves
+  \wpre{\syn{las\_vegas}(sd, init, test)}
+    {\lambda \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n)}.
+  \]
+\end{theorem}
+
+\begin{proof}
+  The goal is:
+  \[
+  \wpre{\syn{las\_vegas}(sd, init, test)}
+    {\lambda \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n)}.
+  \]
+  We reason through the definition step by step.
+
+  \textbf{Step 1: Create and seed the generator.}
+  Apply \textsc{WP-PRNG-NEW} to allocate a fresh generator \(r\).
+  This gives \(\knownprng(r)\) and updates the PRNG ghost state.
+  Then apply \textsc{WP-ALLOC} (the store allocation rule) to allocate
+  a heap cell \(s\) containing \(\gRet(init)\), giving the points-to
+  predicate \(s \pointsto init\).  By \textsc{WP-SEQ} followed by
+  \textsc{WP-PRNG-SEED}, we seed the generator with \(sd\).  The goal
+  reduces to proving the while-loop:
+  \[
+  \wpre{\gwhile\;(\mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s))
+                 \;(\mathrm{LET}\;(\mathrm{PRNG\_GEN}\;r)\;(\mathrm{WRITE}\;s))}
+        {\lambda \_.\; \wpre{\mathrm{READ}\;s}
+          {\lambda \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n)}}.
+  \]
+
+  \textbf{Step 2: L\"ob induction.}
+  Since \(\gwhile\) is defined via guarded recursion, we use L\"ob
+  induction.  Assume the induction hypothesis:
+  \[
+  \IH \equiv \later\wpre{\gwhile\;(\cdots)}{ \lambda \_.\;
+    \wpre{\mathrm{READ}\;s}{\lambda \beta.\; \exists n.\;
+      \beta \equiv \gRet(n) \land f(n)} }.
+  \]
+  Unfolding \(\gwhile\):
+  \[
+  \gwhile(\alpha)(\beta) \equiv
+    \gif(\alpha)(\beta \cbvap \Tick(\gwhile(\alpha)(\beta)))(\gRet(())).
+  \]
+  Here \(\alpha \eqdef \mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s)\)
+  and \(\beta \eqdef \mathrm{LET}\;(\mathrm{PRNG\_GEN}\;r)\;
+  (\mathrm{WRITE}\;s)\).
+
+  \textbf{Step 3: Read and test.}
+  Apply \textsc{WP-READ} to read the current value \(n\) from the store
+  cell \(s\), preserving \(s \pointsto n\).  The test predicate
+  \(test\) satisfies:
+  \[
+  \forall n.\; \wpre{test \cbvap \gRet(n)}
+    {\lambda \gamma.\; \gamma \equiv \gRet(1) \lor
+                      \gamma \equiv \gRet(0)}.
+  \]
+  Applying the test to \(n\) and using \(\mathrm{neg\_bool}\), the
+  condition \(\alpha\) evaluates to either \(\gRet(0)\) (test passed)
+  or \(\gRet(1)\) (test failed).  We perform case analysis.
+
+  \textbf{Step 4: Case analysis on the test outcome.}
+  \begin{itemize}
+    \item \textbf{Test passed} (\(f(n)\) holds): then
+      \(\alpha \equiv \gRet(0)\) and the \(\gif\) reduces to
+      \(\gRet(())\).  By the sequencing rule we proceed to
+      \(\mathrm{READ}\;s\), which returns \(n\).  This satisfies
+      the post-condition with witness \(n\) since \(f(n)\) holds.
+
+    \item \textbf{Test failed} (\(f(n)\) does not hold): then
+      \(\alpha \equiv \gRet(1)\) and the \(\gif\) reduces to
+      \(\beta \cbvap \Tick(\gwhile(\alpha)(\beta))\).
+      Applying the CBV application rule, we execute
+      \(\mathrm{LET}\;(\mathrm{PRNG\_GEN}\;r)\;(\mathrm{WRITE}\;s)\):
+      \textsc{WP-PRNG-GEN} samples a fresh number \(m\) from the
+      generator, and \textsc{WP-WRITE} stores \(m\) into the cell \(s\),
+      updating the points-to predicate to \(s \pointsto m\).
+      A tick step discharges the \(\later\) in the induction hypothesis
+      \(\IH\), which we apply with the updated state to complete the
+      loop iteration.
+  \end{itemize}
+  Throughout, the GItree equational theory and homomorphism rules are
+  used to expose head-normal forms for symbolic execution.
+\end{proof}
+
+It is worth mentioning that the effect signature can be given alternative semantics. More specifically, it can be reified as non-deterministic choice or sampling from a discrete probabilistic distribution. Depending on how the effect is how the effect is interpreted, different program logics rule can be derived, enabling reasoning about GItree programs that involves non-determinism or probabilistic behavior. Unfortunately, these two alternative reifications cannot be implemented in the current formalization since reifiers have to be a Rocq function, which is pure and total.\par
+Finally, we mention that the implicit state WP rules is sound for all three possible reifications as it requires the program continue execution safely regardless of the number being generated. Programs that are proven to be safe with this set of rules are safe no matter how we choose to interpret the effect. Specifically, the Las Vegas program will remain to be safe if we replace the PRNG reifier with a probabilistic sampling reifier.
+
+\subsection{Interpreting \(\lambda_\prng\) in guarded interaction trees}
+
+Now that a theory of PRNG effects is in place, we can give a denotational semantics of \(\lambda_\prng\) by interpreting \(\lambda_\prng\) programs as GItrees with PRNG effects. We define a map \(\sem{-}_\senv\) from \(\lambda_\prng\) expresisions to \(\IT_{\prng}(\mathbf{1} + \mathbb{N} + \iLoc)\), where \(\senv:\iVar \to \IT\) is a substitution environment for free variables. The interpretation is depicted in the following figure and should be straight-forward.
+\[
+  \begin{aligned}
+    \sem{\vunit}_\senv &\eqdef \gRet(())
+    \quad \sem{n}_\senv \eqdef \gRet(n)
+    \quad \sem{\loc}_\senv \eqdef \gRet(\loc) \\
+    \sem{x}_\senv &\eqdef \senv(x) \\
+    \sem{e_1 \oplus e_2}_\senv &\eqdef \gnatop{\oplus}(\sem{e_1}_\senv)(\sem{e_2}_\senv) \\
+    \sem{\syn{if}\;e_0\;\syn{then}\;e_1\;\syn{else}\;e_2}_\senv & \eqdef \gif(\sem{e_0}_\senv)(\sem{e_1}_\senv)(\sem{e_2}_\senv) \\
+    \sem{\eapp{e_1}{e_2}}_\senv &\eqdef \sem{e_1}_\senv \cbvap \sem{e_2}_\senv \\
+    \sem{\recval{f}{x}{\expr}}_\senv
+                  &\eqdef \fix\;\lambda (\alpha : \latert \IT).\; 
+                  \gFun\left(\later\!\circ\!\left(\lambda \alpha'\;v.\;
+                  \sem{\expr}_{\senv[x\mapsto v,\;f\mapsto \alpha']}\right)(\alpha)\right) \\
+    \sem{\kw{NewPrng}}_\senv &\eqdef \mathrm{PRNG\_NEW}\;\gRet \\
+    \sem{\kw{DelPrng}\;e}_\senv &\eqdef \getret(\mathrm{PRNG\_DEL})(\sem{e}_\senv) \\
+    \sem{\kw{Rand}\;e}_\senv &\eqdef \getret(\mathrm{PRNG\_GEN})(\sem{e}_\senv) \\
+    \sem{\kw{Seed}\;e_1\;e_2}_\senv &\eqdef \mathrm{SeedGit}\;(\sem{e_1}_\senv)\;(\sem{e_2}_\senv)
+  \end{aligned}
+\]
+
+where \(\fix : \latert \IT \to \IT\) is the guarded fixed point combinator;
+\(\later\!\circ\) transforms the function of type \(\IT \to (\IT \to \IT)\) into \(\latert \IT \to \latert (\IT \to \IT)\) so that \(t : \latert \IT\) can be applied;
+and \(\mathrm{SeedGit} : \IT \to \IT \to \IT\) is a derived GItree combinator that evaluates the two arguments from right to left before passing them to \(\mathrm{PRNG\_SEED}\).
+
+% goal : [IT]
+% 1. use [fix], construct [IT] given [t : later IT]
+% 2. use [Fun], construct [later (IT -> IT)] given [t : later IT]
+% 3. use [later map], construct [IT -> IT] given [t' : IT]
+% 4. introduce [v : IT], construct [IT]
+% 5. interpret [e] under environment with [x -> v, f -> t']
+
+We also interpret evaluation contexts as functions \(\IT\to\IT\).
+
+\[
+  \begin{aligned}
+    \sem{\ctxhole}_\senv(\alpha) &\eqdef \alpha\\
+    \sem{K\;e}_\senv(\alpha) &\eqdef \sem{K}_\senv(\alpha)\cbvap\sem{e}_\senv
+    \quad \sem{v\;K}_\senv(\alpha) \eqdef \sem{v}_\senv\cbvap\sem{K}_\senv(\alpha)\\
+    \sem{K \oplus e}_\env(\alpha) &\eqdef \gnatop{\oplus}(\sem{K}_\senv(\alpha))(\sem{e}_\senv)
+    \quad \sem{v \oplus K}_\env(\alpha) \eqdef \gnatop{\oplus}(\sem{e}_\senv)(\sem{K}_\senv(\alpha))\\
+    \sem{\syn{if}\;K\;\syn{then}\;e_1\;\syn{else}\;e_2}(\alpha) & \eqdef \gif(\sem{K}_\senv(\alpha))(\sem{e_1}_\senv)(\sem{e_2}_\senv)\\
+    \sem{\kw{DelPrng}\;K}_\senv(\alpha) &\eqdef \getret(\mathrm{PRNG\_DEL})(\sem{K}_\senv(\alpha)) \\
+    \sem{\kw{Rand}\;K}_\senv(\alpha) &\eqdef \getret(\mathrm{PRNG\_GEN})(\sem{K}_\senv(\alpha)) \\
+    \sem{\kw{Seed}\;K\;e}_\senv(\alpha) &\eqdef \mathrm{SeedGit}\;(\sem{K}_\senv(\alpha))\;(\sem{e}_\senv)\\
+    \sem{\kw{Seed}\;v\;K}_\senv(\alpha) &\eqdef \mathrm{SeedGit}\;(\sem{v}_\senv)\;(\sem{K}_\senv(\alpha))\\
+  \end{aligned}
+\]
+
+We can show that \(\sem{K[e]} \equiv \sem{K}(\sem{e})\), which means our interpretation is compositional.
+Using the GItree combinator equational reasoning rules, we can prove that \(\lambda_\prng\) evaluation contexts corresponds to GItree evaluation contexts, i.e., GItree homomorphisms.\par
+
+
+Having defined an interpretation of \(\lambda_\prng\) programs in terms of GItrees,
+we would like to show that \(\sem{e}\) faithfully and adequately captures the operational semantics by relating the execution of \(e\) and the reduction of \(\sem{e}\),
+which will allow us to leverage the interpretation to prove semantical properties, e.g. type safety and contextual refinement, without directly working on the operational semantics.\par
+
+Our first result is the soundness of this denotational interpretation, which can be proved directly by induction.
+\begin{theorem}[Soundness of the GItree interpretation for \(\lambda_\prng\)]
+  Let \(e_1,e_2\) be two closed \(\lambda_\prng\) programs, \(\sigma_1,\sigma_2\) be two PRNG states,
+  \[
+    (e_1,\sigma_1) \redu^\ast (e_2,\sigma_2)
+    \implies
+    (\sem{e_1},\sigma_1) \Redu^\ast (\sem{e_2},\sigma_2)
+  \]
+  for every natural number \(n\in\mathbb{N}\).
+\end{theorem}
+
+It states that if a program \(e_1\) can steps to \(e_2\) while taking the state from \(\sigma_1\) to \(\sigma_2\),
+the GItree denotation \(\sem{e_1}\) reduces to \(\sem{e_2}\) and changes the refiers state accordingly.
+
+\subsection{Binary logical relation for adequacy}
+
+In this part, we prove that our denotational semantics enjoys the computational adequacy respect to the operational semantics,
+which connects GItree reductions back to \(\lambda_\prng\) reductions.
+
+\begin{theorem}[Adequacy of the GItree interpretation for \(\lambda_\prng\)]
+  Let \(\typed{\bullet}{e}{\tnat}\) be a closed \(\lambda_\prng\) program, \(n\) be a natural number, and \(\sigma,\sigma'\) be two PRNG states,
+  \[
+    (\sem{e},\sigma) \Redu^\ast (\gRet(n), \sigma')
+    \implies
+    (e,\sigma) \redu^\ast (n, \sigma')
+  \]
+\end{theorem}
+
+As a direct corollary, we can prove contextual equivalence by demonstrating denotational equivalence.
+
+\begin{corollary}[Denotational equivalence implies contextual equivalence]
+  Let \(\typed{\Gamma}{e_1}{\tau}\) and \(\typed{\Gamma}{e_2}{\tau}\) be two \(\lambda_\prng\) terms of type \(\tau\) under context \(\Gamma\),
+  \[
+    (\forall (\senv : \Gamma \to \IT).\;\sem{e_1}_\senv = \sem{e_2}_\senv)
+    \implies
+    e_1 \cong_{\mathrm{ctx}} e_2
+  \]
+  where \(e_1 \cong_{\mathrm{ctx}} e_2\) denotes standard contextual equivalence
+  for every context \(C\), which is not necessarily an evaluation context, such such that \(\typed{\bullet}{C[e_1]}{\tnat}\) and \(\typed{\bullet}{C[e_2]}{\tnat}\),
+  \[
+    \forall \sigma, \sigma',n .\;
+    (C[e_1],\sigma) \redu^* (n,\sigma')
+    \iff
+    (C[e_2],\sigma) \redu^* (n,\sigma')
+  \]
+\end{corollary}
+
+While the theorem statement concerns only base type programs, its indirectly consequences propagates to higher-order function types since the evaluation of a base type program \(\typed{\bullet}{e}{\tnat}\) might involve evaluation of arbitrarily complex functions.
+To make this point clear, consider the following consequences of the computational adequacy theorem:
+\begin{enumerate}
+  \item For every program \(\typed{\bullet}{f_1}{\tau_1}\), where \(\tau_1 = \tnat \to \tnat\) 
+    \[
+      \forall m,n,\sigma,\sigma'.\; (\sem{f_1}\cbvap \gRet(m),\sigma) \Redu^* (\gRet(n),\sigma')
+      \implies (f_1\;m,\sigma) \redu^* (n,\sigma')
+    \]
+    Note that for \(f_1\;m\) to evaluate to \(n\), \(f_1\) must first reduce to a suitable head-normal form.
+  \item For every program \(\typed{\bullet}{f_2}{\tau_2}\), where \(\tau_2 = \tau_1 \to \tnat\) 
+    \[
+      \forall f_1, n,\sigma,\sigma' .\;
+      \typed{\bullet}{f_1}{\tau_1}
+      \land (\sem{f_2}\cbvap \sem{f_1},\sigma) \Redu^* (\gRet(n),\sigma')
+      \implies (f_2\;f_1,\sigma) \redu^* (n,\sigma')
+    \]
+    Similarly, \(f_2\) must reduce to a suitable head-normal form.
+  \item For every program \(\typed{\bullet}{f_3}{\tau_3}\), where\(\tau_3 = \tau_2 \to \tnat\) and 
+    \[
+      \forall f_2, n, \sigma, \sigma' .\;
+      \typed{\bullet}{f_2}{\tau_2}
+      \land (\sem{f_3}\cbvap \sem{f_2},\sigma) \Redu^* (\gRet(n),\sigma')
+      \implies (f_3\;f_2,\sigma) \redu^* (n,\sigma')
+    \]
+    Here \(f_3\) must reduce to a suitable head-normal form.
+\end{enumerate}
+To handle the higher-order nature of the adequacy theorem, we use the logical relations proof method.
+More specifically, we will define a family of binary logical relation over \(\lambda_\prng\) terms and GItrees.\par
+
+\begin{definition}[Binary logical relation for adequacy]
+  We first define the value and expression relations over closed programs:
+  \begin{align*}
+    \mathcal{V} & : \iType \to \mathrm{Rel}(\IT,\iVal) \\
+    \mathcal{V}_{\tunit}(\alpha_v,v) &\eqdef \alpha_v \equiv \gRet(()) \land v \equiv \vunit \\
+    \mathcal{V}_{\tnat}(\alpha_v,v)  &\eqdef \exists n.\; \alpha_v \equiv \gRet(n) \land v \equiv n \\
+    \mathcal{V}_{\syn{prng}}(\alpha_v,v) &\eqdef \exists \loc.\;
+    \alpha_v \equiv \gRet(\loc) \land v \equiv \loc \star \knownprng(\loc) \\
+    \mathcal{V}_{\type_1 \to \type_2}(\alpha_v,v) &\eqdef \exists f.\;
+    \alpha_v \equiv \gFun(f) \land
+    \Box\forall \beta_v,u.\; \mathcal{V}_{\type_1}(\beta_v,u) \wand
+    \mathcal{E}_{\type_2}(\gFun(f)\cbvap \beta_v,\; \eapp{v}{v'})\\
+    \mathcal{E} & : \iType \to \mathrm{Rel}(\IT,\iExpr) \\[0.6ex]
+    \mathcal{E}_{\type}(\alpha,e) &\eqdef \forall \sigma.\;
+    \hasstate(\sigma) \star \hasprngs(\sigma) \wand
+    \wpre{\alpha}{\alpha_v.\; \exists v,\sigma'.\;
+      \begin{array}[t]{ll}
+        &(e,\sigma) \redu^\ast (v,\sigma')\\
+        \star & \hasstate(\sigma')\\
+        \star & \hasprngs(\sigma')\\
+        \star & \mathcal{V}_{\type}(\alpha_v,v)
+    \end{array}}
+  \end{align*}
+  Define the context relation
+  \begin{align*}
+    \mathcal{C} &: (\Gamma : \mathrm{Ctx}) \to \mathrm{Rel}(\Gamma\to \IT, \Gamma \to \iVal) \\
+    \mathcal{C}_{\Gamma}(\senv,\env) &\eqdef \forall x\in\Gamma.\;
+    \mathcal{V}_{\Gamma(x)}(\senv(x),\env(x))
+  \end{align*}
+  Finally, define the semantic typing relation by lifting the expression relation to open terms.
+  \begin{align*}
+    \typedSem{\Gamma}{e}{\type} \eqdef
+    \forall \senv,\env.\;
+    \mathcal{C}_{\Gamma}(\env,\senv) \wand
+    \mathcal{E}_{\type}(\sem{e}_\senv,\; e[\env])
+  \end{align*}
+\end{definition}
+
+Using the symbolic execution weakest precondition proof rules, we can prove that every typing rule has a semantically well-typed relation version.
+We illustrate with several representative compatibility lemmas.
+
+The following bind lemma is essential for compositional reasoning:
+
+\begin{lemma}[rel-bind]
+  Let \(f : \IT \to \IT\) be a GItree homomorphism and \(K\) an
+  evaluation context.  For any relations \(\Psi,\Phi\):
+  \[
+  \mathcal{E}_\Psi(\alpha,e) \wand
+  \bigl(\forall \alpha_v,v.\; \Psi(\alpha_v,v) \wand
+        \mathcal{E}_\Phi(f(\alpha_v),\; K[v])\bigr) \wand
+  \mathcal{E}_\Phi(f(\alpha),\; K[e]).
+  \]
+\end{lemma}
+\begin{proof}
+  Unfolding \(\mathcal{E}\), fix a state \(\sigma\).  From the first premise
+  we obtain \(\wpre{\alpha}{\beta_v.\; \exists v,\sigma'.\;
+    (e,\sigma)\redu^\ast(v,\sigma') \star \cdots}\).  Apply
+  \textsc{WP-BIND} (the homomorphism version of the bind rule) to
+  \(f\) and \(K\), then use the second premise to continue from the
+  intermediate value.
+\end{proof}
+
+\begin{lemma}[compat-NewPrng]
+  \( \displaystyle \typedSem{\Gamma}{\kw{NewPrng}}{\syn{prng}} \)
+\end{lemma}
+\begin{proof}
+  Fix \(\env,\senv\) with \(\mathcal{C}_\Gamma(\senv,\env)\) and a state \(\sigma\).
+  By definition, \(\sem{\kw{NewPrng}}_\senv \equiv \mathrm{PRNG\_NEW}\;\gRet\).
+  Apply \textsc{WP-PRNG-NEW} (the implicit-state rule):
+  \[
+  \inferrule{\prngCtx \\
+    \later\later(\forall \loc.\; \knownprng(\loc) \wand
+      \wpre{\gRet(\loc)}{\alpha_v.\; \exists v,\sigma'.\;
+        (\kw{NewPrng},\sigma)\redu^\ast(v,\sigma') \star \cdots})}
+    {\wpre{\mathrm{PRNG\_NEW}\;\gRet}{\alpha_v.\; \cdots}}.
+  \]
+  From the operational side, we have
+  \((\kw{NewPrng},\sigma) \redu (\loc,\sigma[\loc\easgn 0])\) where
+  \(\loc \notin \dom(\sigma)\).  The ghost state update is justified by
+  \textsc{ISTATE-ALLOC}, which provides \(\knownprng(\loc)\) and the
+  updated PRNG store.  This matches the value relation
+  \(\mathcal{V}_{\syn{prng}}(\gRet(\loc),\loc)\).
+\end{proof}
+
+\begin{lemma}[compat-Rand]
+  \( \displaystyle
+  \typedSem{\Gamma}{e}{\syn{prng}} \implies
+  \typedSem{\Gamma}{\kw{Rand}\;e}{\tnat} \)
+\end{lemma}
+\begin{proof}
+  Let \(\sem{e}_\senv = \alpha\) and \(e[\env] = e'\).  By the
+  induction hypothesis, \(\mathcal{E}_{\syn{prng}}(\alpha,e')\) holds.
+  Apply \textsc{rel-bind} with
+  \(f \eqdef \getret(\mathrm{PRNG\_GEN})\) and
+  \(K \eqdef \kw{Rand}\,\ctxhole\):
+  \[
+  \mathcal{V}_{\syn{prng}}(\alpha_v,\loc) \wand
+  \mathcal{E}_{\tnat}(\mathrm{PRNG\_GEN}\;\loc,\;
+    \kw{Rand}\;\loc[\env]).
+  \]
+  From \(\mathcal{V}_{\syn{prng}}\) we have \(\alpha_v \equiv \gRet(\loc)\),
+  \(\loc\) is a literal, and \(\knownprng(\loc)\).
+  Applying \textsc{WP-PRNG-GEN} with \(\prngCtx\) and the persistent
+  \(\knownprng(\loc)\):
+  \[
+  \wpre{\mathrm{PRNG\_GEN}\;\loc}{
+    \beta_v.\; \exists n.\; \beta_v \equiv \gRet(n)}.
+  \]
+  Operationally, \((\kw{Rand}\;\loc) \redu (\out(m))\) where
+  \(\sigma(\loc)=m\).  So \(\exists n.\; \beta_v \equiv \gRet(n)\) matches
+  \(\mathcal{V}_{\tnat}(\beta_v,\out(m))\).
+\end{proof}
+
+\begin{lemma}[compat-Seed]
+  \( \displaystyle
+  \typedSem{\Gamma}{e_l}{\syn{prng}} \implies
+  \typedSem{\Gamma}{e_s}{\tnat} \implies
+  \typedSem{\Gamma}{\kw{Seed}\;e_l\;e_s}{\tunit} \)
+\end{lemma}
+\begin{proof}
+  Apply \textsc{rel-bind} twice.  First, with
+  \(f_1 \eqdef \mathrm{SeedGitCtxL}(\sem{e_s})\) and
+  \(K_1 \eqdef \kw{Seed}\,\ctxhole\,e_s\) to evaluate \(e_l\).
+  This yields \(\mathcal{V}_{\syn{prng}}(\alpha_l,\loc)\) with
+  \(\knownprng(\loc)\).  Then, with
+  \(f_2 \eqdef \mathrm{SeedGitCtxS}(\gRet(\loc))\) and
+  \(K_2 \eqdef \kw{Seed}\,\loc\,\ctxhole\) to evaluate \(e_s\).
+  This yields \(\mathcal{V}_{\tnat}(\alpha_s,m)\).
+  Using \textsc{SeedGit-Ret} we rewrite
+  \(\mathrm{SeedGitCtxS}(\gRet(\loc))(\gRet(m)) \equiv
+    \mathrm{PRNG\_SEED}\;\loc\;m\).
+  Applying \textsc{WP-PRNG-SEED}, we obtain safety, and the operational
+  side is discharged by \((\kw{Seed}\;\loc\;m)\redu(\vunit)\).
+\end{proof}
+
+\begin{lemma}[compat-App]
+  \( \displaystyle
+  \typedSem{\Gamma}{e_1}{\type_1\to\type_2} \implies
+  \typedSem{\Gamma}{e_2}{\type_1} \implies
+  \typedSem{\Gamma}{e_1\;e_2}{\type_2} \)
+\end{lemma}
+\begin{proof}
+  Let \(\sem{e_i}_\senv = \alpha_i\) and \(e_i[\env] = e'_i\).
+  Applying \textsc{rel-bind} with
+  \(f \eqdef \alpha_1\cbvap - \) and \(K \eqdef e'_1\cbvap -\) to evaluate
+  \(e_2\), we obtain \(\mathcal{V}_{\type_1}(\beta_v,u)\).
+  Then apply \textsc{rel-bind} again with
+  \(f \eqdef - \cbvap {\beta_v}\) and \(K \eqdef - \cbvap {u}\) to evaluate
+  \(e_1\), obtaining \(\mathcal{V}_{\type_1\to\type_2}(\varphi_v,f)\).
+  By the definition of the function value relation:
+  \[
+  \mathcal{V}_{\type_1\to\type_2}(\varphi_v,f) \equiv
+  \exists \varphi'.\; \varphi_v \equiv \gFun(\varphi') \land
+  \Box\forall \beta_v,u.\;
+    \mathcal{V}_{\type_1}(\beta_v,u) \wand
+    \mathcal{E}_{\type_2}(\gFun(\varphi')\cbvap\beta_v,\;
+      \eapp{f}{u}).
+  \]
+  Instantiating with \(\beta_v,u\) from the first application, we get
+  \(\mathcal{E}_{\type_2}(\sem{e_1\;e_2}_\senv,\; (e_1\;e_2)[\env])\).
+\end{proof}
+
+\begin{lemma}[compat-Rec]
+  \( \displaystyle
+  \typedSem{\Gamma,f:\type_1\to\type_2,\;x:\type_1}{e}{\type_2} \implies
+  \typedSem{\Gamma}{\recval{f}{x}{e}}{\type_1\to\type_2} \)
+\end{lemma}
+\begin{proof}
+  The interpretation gives
+  \(\sem{\recval{f}{x}{e}}_\senv \equiv
+  \gFun(\Next(\lambda v.\; \sem{e}_{\senv[x \mapsto v; f\mapsto \sem{\recval{f}{x}{e}}_\senv}))\).
+  We apply the value case of the expression relation, which reduces to
+  showing the function value relation:
+  \[
+  \Box\forall \beta_v,u.\;
+    \mathcal{V}_{\type_1}(\beta_v,u) \wand
+    \mathcal{E}_{\type_2}(
+      \gFun(\Next f)\cbvap\beta_v,\;
+      \eapp{(\recval{f}{x}{e})[\env]}{u}).
+  \]
+  Using the CBV application rule and the operational beta-reduction,
+  we apply \textsc{rel-pure-expansion}:
+  \[
+  \gFun(\Next f)\cbvap\gRet(v) \equiv \Tick(f\;v),
+  \qquad
+  (\recval{f}{x}{e})\;u \redu e[\recval{f}{x}{e}/f,\;u/x].
+  \]
+  The goal becomes
+  \(\mathcal{E}_{\type_2}(\sem{e}_{\senv[f\mapsto\gFun(\Next f),\;x\mapsto v]},\;
+    e[\env,f\!\mapsto\!\recval{f}{x}{e}[\env],\;x\!\mapsto\!u])\),
+  which is justified by the induction hypothesis and a tick step.
+  The Löb axiom internalised in Iris discharges the guardedness:
+  the recursive occurrence of \(\recval{f}{x}{e}\) is under a \(\later\)
+  modality, which is eliminated by the tick step during application.
+\end{proof}
+
+These lemmas are proved by mutual induction on the typing derivation.
+Each case uses the appropriate WP proof rule for the PRNG effect
+(\textsc{WP-PRNG-NEW}, \textsc{WP-PRNG-GEN}, \textsc{WP-PRNG-SEED}),
+the bind lemma \textsc{rel-bind}, and the GItree equational theory.
+The full Coq mechanization is available in \texttt{logrel.v}.
+
+As a direct result, we have the following theorem:
+\begin{theorem}[fundamental theorem]
+  Every well-typed term \(\expr\) is related to its GItree denotation \(\sem{\expr}\):
+  \[
+    \typed{\Gamma}{\expr}{\type} \implies \typedSem{\Gamma}{\expr}{\type} 
+  \]
+\end{theorem}
+
+The computational adequacy theorem is derived by specializing the fundamental theorem with \(\Gamma = \bullet\) and \(\type = \tnat\).
+
+% TODO: we are here ...
+\subsection{An incomplete proof for type safety}
+
+As hinted at the beginning of this subsection, we can investigate properties of \(\lambda_\prng\) by operating at the level of GItree denotational semantics, circumventing the operational semantics of the language. We showcase this approach with a partial proof of the type safety of \(\lambda_\prng\).\par
+
+Let \(\typed{\bullet}{e}{\tau}\) be a well-typed closed program.
+We apply the fundamental lemma to show \(\mathcal{E}_\tau(\sem{e},e)\), which expands to the following proposition:
+
+\[
+  \forall \sigma.\;
+  \hasstate(\sigma) \star \hasprngs(\sigma) \wand
+  \wpre{\sem{e}}{\alpha_v.\; \exists v,\sigma'.\;
+    \begin{array}[t]{ll}
+        &(e,\sigma) \redu^\ast (v,\sigma')\\
+      \star & \hasstate(\sigma')\\
+      \star & \hasprngs(\sigma')\\
+      \star & \mathcal{V}_{\type}(\alpha_v,v)
+  \end{array}}
+\]
+
+We can instantiate \(\sigma\) with an empty store and allocate the ghost recourse for \(\hasstate(\sigma)\) and \(\hasprngs(\sigma)\).
+
+\[
+  \wpre{\sem{e}}{\alpha_v.\; \exists v,\sigma'.\;
+    \begin{array}[t]{ll}
+        &(e,\emptyset) \redu^\ast (v,\sigma')\\
+      \star & \hasstate(\sigma')\\
+      \star & \hasprngs(\sigma')\\
+      \star & \mathcal{V}_{\type}(\alpha_v,v)
+  \end{array}}
+\]
+
+We use the consequence rule of the weakest precondition to remove the ghost resources in the post-condition.
+
+\[
+  \wpre{\sem{e}}{\alpha_v.\; \exists v,\sigma'.\; (e,\emptyset) \redu^\ast (v,\sigma') }
+\]
+
+% FIXME: wait, we don't really have an erroneous state in the operational semantics. We represent error as stuckness.
+
+We have derived the weakest precondition for \(\sem{e}\) with a pure post-condition.
+By invoking the adequacy of the GItree program logic, we conclude that \(\sem{e}\) runs safely and reduces to a suitable GItree head normal forms if it terminates.
+The result immediately gives that ``\(e\) cannot go wrong'' safety, i.e.,  \((e,\emptyset)\) cannot run into an erroneous state.
+Suppose that the program reduces to an error, then by the soundness lemma, \(\sem{e}\) should also run to an error, which contradicts the weakest precondition proposition.\par
+However, we find ourselves stuck when trying to derive the progressiveness of \(e\).
+This is because that all the information about the execution of \(e\) is in the post-condition, which we only get access to it when \(\sem{e}\) reduces to a value, yet \(\wpre{\sem{e}}{\cdot}\) only guarantees the progressiveness of \(\sem{e}\) with respect to \(\Redu\).
+Indeed, in the presence of general recursion, we have no hope of proving the termination of \(\sem{e}\) from the weakest precondition.\par
+
+To complete the proof, we would need the soundness of the GItree program logic, specialized to the denotation of \(\lambda_\prng\) programs, with respect to the operational semantics of \(\lambda_\prng\).
+This is the kind of adequacy theorems discussed in program logics \`a la carte\cite{proglog-carte}.
+The research paper proposed a modular approach of building program logic for effectful languagees.
+In their settings, they define \(\wpre{e}{\Phi}\) as \(\wpre{\sem{e}}{\Phi}\) where \(\sem{\cdot}\) interprets programs as interaction trees\cite{itrees}. By doing so, the equational theory of ITrees and various effect theories can be reused to build program logic for different languages.
+Whenever a program logic is defined, an adequacy theorem linking \(\wpre{\sem{e}}{\Phi}\) with the operational semantics of \(e\) has to be established.
+To the best of our knowledge, no similar experimentation has been done for guarded interaction trees.
+
+\section{Modeling interactions with physical devices}
+
+% TODO: expand ... explain how this is a generalization of the 
+
+\section{Discussion and Future Works}
+
+This project has explored the application of guarded interaction trees as a semantic domain for effectful higher-order languages. Specifically, we have developed a computationally adequte denotational semantics for a functional language equipped with PRNG effects.\par
+
+While the project is overall successful, my solution to several technical difficulties are not completely satisfying and requires future refinement.
+
+\begin{enumerate}
+  \item The computational adequacy result is not strong enough.
+    From \(\sem{e}\Redu^\ast (\gRet(n),\sigma')\), one can derive \((e,\sigma) \redu^\ast (n,\sigma')\) but gains no knowledge on how \(\sigma\) evolves to \(\sigma'\).
+    This will be insufficient when one want to prove semantic properties involving observation of the state during the execution.
+    For instance, program indistinguishability cannot be proved if the threat model allows the attack to inspect the store during program execution.
+    % TODO: rephrase this.
+    % It can be difficult to do so. But we probably imagine it impossible.
+    % frame this thing as: some strengthening is needed before we can use this theorem to prove indistinguishability stuff.
+    % some full-abstraction results
+  \item While the effect interpretations and program logic rules are modularly defined,
+    the effectful programming language itself is not constructed in a modular approach.
+    As a result, one cannot easily construct a language integrating I/O tape, higher-order store and PRNG by piecing three languages together.
+  \item \(\syn{SEED}\) is an operator taking more than one argument.
+    It is tricky to find a appropriate GItree interpretation that reduces generate only a single tick.
+  \item No program logic rules is derived for \(\mathrm{PRNG\_DEL}\), and no typing rule is defined for \(\syn{DelPrng}\).
+    The root cause is that no restriction on sharing of generators is imposed.
+    The benefit of this design is that \(\knownprng(\ell)\) becomes persistent so proofs were mostly straight-forward, however, it indeed limits the expressiveness of our program logic.
+    One way to lift this limitation is to use fractional ownership, but I haven't experimented with that.
+    Once a finer effect theory is developed, one can experiment proving soundness of a qualitative type system for \(\lambda_\prng\), which allows deletion of exclusively owned generators.
+  \item An alternative way of building the PRNG effect is to reuse the higher-order store effect.
+    I explored this approach initially but abandoned it later for technical difficulties.
+  \item I didn't experiment interpreting the effect as non-deterministic or probabilistic generation.
+  \item Weaker bisimulation of GItrees as a more helpful equivaleence notion.
+    pertaining to the previous point of multiple ticks.
+  \item less ideal effect handling ...
+    Unify SubOfe, SubEff, and SubReifiers.
+
+\end{enumerate}
+
+Looking forward, the GItree framework provides a promising substrate for reasoning about cyber-physical systems. Future works could investigate the modeling and reasoning of interaction between controllers and physical devices, in the presence of real-time constraints, non-deterministic responses, and probabilistic actions.
+As explained before, the theory of GItrees has to be generalized to allow defining reifiers as not merely a function in the metatheory. This will require rephrasing great part of existing works either in written down informally on paper or formalized in Rocq.
+There are multiple ways to extend the theory, and it is unclear which one would be optimal:
+(1) One can change reifiers to a binary relation over \((\IT,State)\) with richer information. The resulting theory is more operational in the sense reasoning about GItrees will be carried out in an operational style.
+(2) One can allow defining reifiers as an monadic function and endow GItrees with trace semantics. This approach likely gives a more denotational theory.
+
+\section{formalization efforts}
+
+\section{Declaration on Generative AI usage}
+
+In the report write-up phase, I used Generative AI to create proof trees from formal proofs mechanized in Rocq.
+
+\section{acknowledgement}
+
+We thank Sergei for discussion and some assistance in writing and proofreading.
+
+\nocite{*}
+\printbibliography
+
+\end{document}
