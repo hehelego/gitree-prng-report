@@ -99,8 +99,8 @@ sorting=ynt
 \newcommand{\upd}{\mathrm{update}}
 \newcommand{\knownprng}{\textsf{known\_prng}}
 \newcommand{\hasprngs}{\textsf{has\_prngs}}
-\newcommand{\prngCtx}{\knowInv{\iota_\prng}{\exists \sigma.\; \hasstate(\sigma) * \hasprngs(\sigma)}}
-\newcommand{\heapCtx}{\knowInv{\iota_h}{\exists \sigma_h.\; \mathrm{has\_heap}(\sigma_h)}}
+\newcommand{\prngCtx}{\knowInv{\iota p}{\exists \sigma.\; \hasstate(\sigma) * \hasprngs(\sigma)}}
+\newcommand{\heapCtx}{\knowInv{\iota h}{\exists \sigma_h.\; \hasstate(\sigma_h)}}
 \newcommand{\LitV}{\mathrm{LitV}}
 \newcommand{\LitPrng}{\mathrm{LitPrng}}
 \newcommand{\safety}{\mathrm{s}}
@@ -128,7 +128,7 @@ During the semester of spring 2026, I conducted a project work titled \emph{Expl
 The project was carried out in four phases:
 \begin{enumerate}
   \item In the preparation phase, I familiarized myself with writing formal proof using the Iris higher-order separation logic framework within the Rocq proof assistant.
-  \item Subsequently, I studied the research papers \cite{esop25git-callcc,popl24gitree} to learn the general theory of GItrees. I learned using GItrees to interpret programs involving higher-order effects.
+  \item Subsequently, I studied the two research papers on guarded interaction trees~\cite{esop25git-callcc,popl24gitree} to learn the general theory of GItrees. I learned using GItrees to interpret programs involving higher-order effects.
   \item Afterwards, I proposed and completed a case study on interpreting pseudo-randomness as an effect in GItrees. I designed a simple programming language with pseudo-random number generator functionality and developed a denotational semantics based on GItrees for proving safety and contextual equivalence.
     The results have been mechanized in Rocq as an extension to the GItree Rocq formalization\footnote{The Rocq development is available at \url{https://github.com/logsem/gitrees/pull/6}}.
   \item In the final stage, I experimented with modeling and reasoning about interactions between controller programs and physical devices, which is common in Internet of Things (IoT) applications.
@@ -403,9 +403,9 @@ We now present a highly simplified overview of guarded interaction trees. While 
 
 \subsubsection{Effect Signature}
 
-The effects that a program can make use of is described by an \emph{effect signature} \((E,Ins, Outs)\).
+The effects that a program can make use of is described by an \emph{effect signature} \((E, \Ins, \Outs)\).
 \(E\) is a finite set of available effects.
-For each effect \(i \in E\), \(\Ins_i, \Outs_i : \COFE \to \COFE\) are two functors specifying the expected input and output type of effect \(i\).
+For each effect \(i \in E\), the two functors \(\Ins_i, \Outs_i : \COFE \to \COFE\) specify the expected input and output type of effect \(i\), respectively.
 
 For example, we can use the following effect signature to model I/O.
 
@@ -499,12 +499,13 @@ upon which the following definitions and equations can be derived:
   \item A collection of smart constructors for GItrees can be defined using the fold morphism.
     \begin{align*}
       \gRet &: A \to \IT \\
-      \gErr &: Error \to \IT \\
+      \gErr &: \Error \to \IT \\
       \gTau &: \latert \IT \to \IT \\
       \gFun &: \latert (\IT \to \IT) \to \IT \\
-      \gVis &: \forall (op : I) (inputs : Ins_i(\latert \IT)) (callback : Outs_i(\latert \IT) \to \latert \IT) \to \IT
+      \gVis &: \forall (\mathsf{op} : I) (\mathsf{inputs} : \Ins_i(\latert \IT)) (\mathsf{callback} : \Outs_i(\latert \IT) \to \latert \IT) \to \IT
     \end{align*}
-  \item We assume that the value type \(A\) is a coproduct. We write \(\gRet(b)\) for \(\gRet(\vinj{}{b})\) whenever \(b:B\) and \(\vinj{}{} : B\hookrightarrow A\).
+  \item We assume that the base value type \(A\) is a coproduct of the form \(A_1 + A_2 + A_3 \cdots + A_n\).
+    Given an injection \(\vinj{}{} : B\hookrightarrow A\), we write \(\gRet(b)\) for \(\gRet(\vinj{}{b})\) for every \(b:B\).
   \item We call a GItrees of the form \(\gRet(a)\) or \(\gFun(f)\) a value.
     We use Greek letters with \(v\)-subscript, e.g., \(\alpha_v\), for GItree value meta variables.
   \item A function \(\IT_E(A) \to \IT_E(A)\) is called a homomorphism if it satisfies the following equations:
@@ -559,12 +560,14 @@ upon which the following definitions and equations can be derived:
       \gnatop{\oplus}(\gVis_i(x,k))(\beta)   &\equiv
          \gVis_i(x,\latert\circ\gnatop{\oplus}(-)(\beta)\circ k)
     \end{align*}
+  \item \(\getfun(-,f)\), \(\cbnap(-,\beta)\), \(\alpha \cbvap -\), \(-\cbvap \beta_v\), \(\gnatop{\oplus}(-)(\beta)\) and \(\gnatop{\oplus}(\alpha_v)(-)\) are GItree homomorphisms.
   \item While-loop combinator \(\gwhile : \IT \to \IT \to \IT\) defined via guarded recursion:
     \[
       \gwhile(\alpha)(\beta) \eqdef
       \gif(\alpha)(\beta \cbvap \Tick(\gwhile(\alpha)(\beta)))(\gRet(()))
     \]
-  \item \(\getfun(-,f)\), \(\cbnap(-,\beta)\), \(\alpha \cbvap -\), \(-\cbvap \beta_v\), \(\gnatop{\oplus}(-)(\beta)\) and \(\gnatop{\oplus}(\alpha_v)(-)\) are GItree homomorphisms.
+  \item The let-in combinator \(\mathrm{LET}\;x=\alpha\ \mathrm{in}\ \beta \eqdef \getval(\alpha, \lambda x.\;\beta(x))\).
+  \item The sequencing combinator \(e_1;\;e_2 \eqdef \getval(\alpha, \lambda \_.\;\beta)\).
 \end{itemize}
 
 Again, the combinators are metalevel definitions instead of being part of the language of guarded interaction trees.
@@ -621,7 +624,7 @@ As usual, it is defined via a guarded fixed point, asserting that either \(\alph
   \and
   \inferrule[wp-tick]{\later\wpre{\alpha}{\Phi}}{\wpre{\Tick(\alpha)}{\Phi}}
   \and
-  \inferrule[wp-hom]{\text{IT-Hom}(f) \\ \wpre{\alpha}{\alpha_v . \wpre{f(\alpha_v)}{\Phi}}}{\wpre{f(\alpha)}{\Phi}}
+  \inferrule[wp-bind]{\text{IT-Hom}(f) \\ \wpre{\alpha}{\alpha_v . \wpre{f(\alpha_v)}{\Phi}}}{\wpre{f(\alpha)}{\Phi}}
   \and
   \inferrule[wp-upd]{\pvs \wpre{\alpha}{\alpha_v . \pvs \Phi(\alpha_v)}}{\wpre{\alpha}{\Phi}}
   \and
@@ -634,15 +637,17 @@ As usual, it is defined via a guarded fixed point, asserting that either \(\alph
   {\wpre{\gVis_i(x, k)}{\Phi}}
 \end{mathpar}
 
-These proof rules should be mostly familiar. GItree homomorphisms can be viewed as evaluation contexts. The \textsf{WP-VAL} rule is the monadic return and the \textsf{WP-HOM} rule is the monadic bind.
+These proof rules should be mostly familiar. GItree homomorphisms can be viewed as evaluation contexts. The \textsf{WP-VAL} rule is the monadic return and the \textsf{WP-BIND} rule is the monadic bind.
 We note that the context-independent reification rule takes a premise \(\hasstate(\sigma)\), which asserts exclusive and complete ownership of the reifier state.
-However, it is often desirable to reason about effects with partial knowledge of the state. To illustrate this, consider the familiar \textsf{HEAPLANG-WP-LOAD} rule.
+However, it is often desirable to reason about effects with partial knowledge of the state.
+Currently, we cannot derive the following \textsf{WP-READ} and \textsf{WP-WRITE} rules for the higher-order store effect:
 
 \begin{mathpar}
-  \inferrule[HEAPLANG-WP-LOAD]{l\pointsto v}{\wpre{!l}{u . u = v}}
+  \inferrule[wp-read']{l\pointsto \alpha \\ \later (l\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{!l}{\Phi}}
+  \and \inferrule[wp-store']{l\pointsto \alpha \\ \later (l\pointsto \beta \wand \Phi(\gRet()))}{\wpre{l\gets \beta}{\Phi}}
 \end{mathpar}
 
-The proof rule states that a partial view of the heap \(l\pointsto v\) is enough to conclude the safety of a load operation. To recover this kind of reasoning principles, one has to design an accompanying ghost theory, which will be exemplified later sections.\par
+To recover this kind of reasoning principles, one has to design an accompanying ghost theory, which will be exemplified later sections.\par
 
 Building on the adequacy theorem of Iris, a soundness theorem of the GItree program logic with respect to GItree reduction semantics can be proved:
 
@@ -849,7 +854,7 @@ The type rules is mostly standardly and upholds the weakening and substitution l
 
 \subsection{Modeling the PRNG effect in guarded interaction trees}
 
-Here, we following the recipe in \cite{esop25git-callcc} to model the PRNG effects.
+Here, we following the recipe in by Stepanenko et al.~\cite{esop25git-callcc} to model the PRNG effects.
 
 \emph{Step 1: Identify the Key Operations.} The PRNG effect involves three key operations \texttt{new}, \texttt{delete}, \texttt{seed}, and \texttt{rand}.
 
@@ -866,21 +871,21 @@ Here, we following the recipe in \cite{esop25git-callcc} to model the PRNG effec
 
 \begin{itemize}
   \item Effects: \(E = (\new, \del, \seed, \rand)\)
-  \item Creation effect: \(Ins_{\new}(X) = \mathbf{1}\) and \(Outs_{\new}(X) = \iLoc\).
+  \item Creation effect: \(\Ins_{\new}(X) = \mathbf{1}\) and \(\Outs_{\new}(X) = \iLoc\).
     To create a new generator, no data have to be provided. A location, where the generator state is kept, will be returned.
-  \item Deletion effect: \(Ins_{\del}(X) = \iLoc\) and \(Outs_{\del} = \mathbf{1}\).
+  \item Deletion effect: \(\Ins_{\del}(X) = \iLoc\) and \(\Outs_{\del} = \mathbf{1}\).
     To delete a generator, the location of the generator state has to be provided. No meaningful data will be returned.
-  \item Seeding effect: \(Ins_{\seed}(X) = \iLoc \times \mathbb{N}\) and \(Outs_{\seed}(X) = \mathbf{1}\).
+  \item Seeding effect: \(\Ins_{\seed}(X) = \iLoc \times \mathbb{N}\) and \(\Outs_{\seed}(X) = \mathbf{1}\).
     To seed a generator, the state location and the new random seed have to be provided. No meaningful data will be returned.
-  \item Generation effect: \(Ins_{\rand}(X) = \iLoc\) and \(Outs_{\rand}(X) = \mathbb{N}\).
+  \item Generation effect: \(\Ins_{\rand}(X) = \iLoc\) and \(\Outs_{\rand}(X) = \mathbb{N}\).
     To get a random number, location to a generator state has to be provided. A number read out from the random state will be returned.
 \end{itemize}
 
 \emph{Step 4: Implement the Reifiers.} The reification of the PRNG effects is straight-forward.
-Recall that the reifier \(r_e\) of an effect \(e \in E\) ought to be a function \(Ins_{e}(X) \times State(X) \to \option{( Outs_{e}(X) \times State(X) )} \)
+Recall that the reifier \(r_i\) of an effect \(i \in E\) ought to be a function \(\Ins_{i}(X) \times \State(X) \to \option{( \Outs_{i}(X) \times \State(X) )} \)
 
 \begin{align*}
-  r_{\new}((), \sigma) & \eqdef \Some(l, \sigma[l\mapsto 0]) \text{where \(l \notin \dom(\sigma)\) is a fresh location}\\
+  r_{\new}((), \sigma) & \eqdef \Some(l, \sigma[l\mapsto 0]) \text{ \(l \notin \dom(\sigma)\) is a fresh location}\\
   r_{\del}(l,\sigma) & \eqdef \begin{cases}
     \Some((), \mathrm{delete}(\sigma,l)) & l \in \dom(\sigma)\\
     \None & l \notin \dom(\sigma)\\
@@ -903,13 +908,12 @@ To make our programming and reasoning about the PRNG effect easier, we provide s
   \item \(\mathrm{PRNG\_DEL\_k}(l : \iLoc, k : \mathbf{1} \to X) \eqdef \gVis_{\del}(l, \Next \circ k)\)
     and \(\mathrm{PRNG\_DEL}(l,n) \eqdef \mathrm{PRNG\_DEL\_k}(l, n, \gRet())\)
   \item \(\mathrm{PRNG\_SEED\_k}(l : \iLoc, n : \mathbb{N}, k: \mathbf{1} \to X) \eqdef \gVis_{\new}((l,n), \Next \circ k)\)
-    and \(\mathrm{PRNG\_SEED}(l,n) \eqdef \mathrm{PRNG\_SEED\_k}(l, n, \gRet())\)
+    and\\ \(\mathrm{PRNG\_SEED}(l,n) \eqdef \mathrm{PRNG\_SEED\_k}(l, n, \gRet())\)
   \item \(\mathrm{PRNG\_GEN\_k}(l : \iLoc, k: \mathbb{N} \to X) \eqdef \gVis_{\rand}(l, \Next \circ k)\) and \(\mathrm{PRNG\_GEN}(l) \eqdef \mathrm{PRNG\_GEN\_k}(l, \gRet)\)
 \end{itemize}
 
-Equipped with these high-level programming support, one can easily encode randomized algorithms in GItrees.
-Consider the following GItree which uses the PRNG effect and the higher-order store effect:
-
+Equipped with these high-level programming support, one can readily encode randomized algorithms in GItrees.
+We give a simple Las Vegas algorithm GItree program, which uses the PRNG effect and the higher-order store effect:
 \[
 \begin{array}{rcl}
 \mathrm{neg\_bool}(\alpha_n) & \eqdef & \gnatop{\mathrm{sub}}(\gRet(1))(\alpha_n)\\
@@ -920,28 +924,29 @@ Consider the following GItree which uses the PRNG effect and the higher-order st
       \qquad \mathrm{ALLOC}\;(\gRet(init))\;(\lambda s. \\
       \qquad\quad \mathrm{PRNG\_SEED}\;r\;sd; \\
       \qquad\quad \gwhile\;(\mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s)) \\
-      \qquad\qquad (\mathrm{Let}\;x = \mathrm{PRNG\_GEN}\;r\ \mathrm{in}\ \mathrm{WRITE}\;s\;x) \\
+      \qquad\qquad (\mathrm{LET}\;x = \mathrm{PRNG\_GEN}\;r\ \mathrm{in}\ \mathrm{WRITE}\;s\;x) \\
       \qquad\quad \mathrm{READ}\;s))
     \end{array}
 \end{array}
 \]
 
-% TODO: rework this part
-This GItree encodes a Las Vegas algorithm: given an initial guess
-\(init \in \mathbb{N}\), a seed \(sd \in \mathbb{N}\), and a test
-predicate \(test : \mathbb{N} \to \mathbf{2}\) encoded as a GItree,
-it creates a generator \(r\), seeds it with \(sd\), allocates a store
-cell holding \(init\), and loops: while \(test\) fails on the current
-value, it samples a fresh random number from \(r\) and stores it.
-When \(test\) succeeds, the loop exits and returns the satisfying value.
-The macro \(\mathrm{LET}\;e_1\;e_2\) denotes \(\eapp{(\lambda\cdot\;e_2)}{e_1}\)
-and \(\mathrm{SEQ}\;e_1\;e_2\) denotes \(e_1 \cbvap (\lambda\cdot\; e_2)\).
+The behavior of the program can be described as:
+\begin{enumerate}
+  \item Take an initial guess \(init \in \mathbb{N}\), a seed \(sd \in \mathbb{N}\), and a test predicate \(test : \mathbb{N} \to \mathbf{2}\) encoded as a GItree.
+  \item Create a generator \(r\) with initial seeds \(sd\).
+  \item Allocate a store cell \(s\) which holds \(init\) initially.
+  \item If the test fails on the current value \(s\), sample a fresh random number using \(r\), stores it in \(s\), and retry.
+  \item When \(s\) passes the test, the loop stops.
+  \item Read a from \(s\) and return the value.
+\end{enumerate}
+Intuitively, this program should be safe to run and may terminate with a value \(v\) such that \(test(v) = \mathbf{T}\).
+
 
 \emph{Step 6: Derive Program Logic Rules.} While the reifier endows a semantics for the PRNG effect, it is hard to directly prove properties of GItrees involving the PRNG effect. We will derive some weakest precondition proof rules to facilitate modular reasoning of PRNG effects.\par
 
 As we have suggested before, we need to create a ghost theory to enable reasoning about effect reification with partial view on the state.
 We start by pondering the right notion of a partial view for our purpose.
-Given the state functor definition \(State(X) \eqdef \iLoc \fpfn \mathbb{N}\), it is natural to reuse the ``points-to'' predicate \(\ell\pointsto n\), which gives exclusive ownership of the store cell at location \(l\) and the knowledge that the location is valid.
+Given the state functor definition \(\State(X) \eqdef \iLoc \fpfn \mathbb{N}\), it is natural to reuse the ``points-to'' predicate \(\ell\pointsto n\), which gives exclusive ownership of the store cell at location \(l\) and the knowledge that the location is valid.
 However, we quickly realize that this notion of partial view is too strong for the following two reasons.
 \begin{enumerate}
   \item Actual generator states should not be exposed:
@@ -1035,96 +1040,194 @@ Another set of rules with the explicit ownership of the full state threaded thro
   {\wpre{\mathrm{PRNG\_SEED}\;\ell\;m}{\Phi}}
 \end{mathpar}
 
+Similarly, two proof rules for the higher-order store effect can be derived.
 
-To conclude this part, we showcase a proof that the Las Vegas GItree program always finds a valid solution upon termination.  The Coq mechanization of this proof is in \texttt{prng\_examples.v}.
+\begin{mathpar}
+  \inferrule[wp-read]{\heapCtx \\ l\pointsto \alpha \\ \later (l\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{!l}{\Phi}}
+  \and \inferrule[wp-store]{\heapCtx \\ l\pointsto \alpha \\ \later (l\pointsto \beta \wand \Phi(\gRet()))}{\wpre{l\gets \beta}{\Phi}}
+\end{mathpar}
+
+
+To conclude this part, we showcase a proof that the Las Vegas GItree program always finds a valid solution upon termination.
 
 \begin{theorem}[Partial correctness of Las Vegas]
-  Let \(f : \mathbb{N} \to \mathbf{2}\) be a predicate, \(test\) a GItree
-  that decides \(f\) (i.e., \(\forall n.\; test \cbvap \gRet(n)\) reduces to
-  \(\gRet(1)\) if \(f(n)\) holds and \(\gRet(0)\) otherwise), and
-  \(sd, init \in \mathbb{N}\).  Then
+  Let \(f : \mathbb{N} \to \mathbf{2}\) be a predicate, \(test\) be a GItree that implements \(f\) where
   \[
-  \heapCtx \star \prngCtx \proves
-  \wpre{\syn{las\_vegas}(sd, init, test)}
-    {\lambda \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n)}.
+    \persistently\left(
+      \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+      {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+    \right)
+  \]
+  That is, \(test \cbvap \gRet(n)\) reduces to \(\gRet(1)\) if \(f(n)\) holds and \(\gRet(0)\) otherwise.
+
+  For every \(sd, init \in \mathbb{N}\), the following weakest precondition can be derived
+  \[
+    \heapCtx \star \prngCtx \proves
+    \wpre{\syn{las\_vegas}(sd, init, test)}
+    {\beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
   \]
 \end{theorem}
 
+\[
+    \begin{array}[t]{l}
+      \mathrm{PRNG\_NEW}\;(\lambda r. \\
+      \qquad \mathrm{ALLOC}\;(\gRet(init))\;(\lambda s. \\
+      \qquad\quad
+      \mathrm{PRNG\_SEED}\;r\;sd; \\
+      \qquad\quad \gwhile\;(\mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s)) \\
+      \qquad\qquad (\mathrm{LET}\;x = \mathrm{PRNG\_GEN}\;r\ \mathrm{in}\ \mathrm{WRITE}\;s\;x); \\
+      \qquad\quad \mathrm{READ}\;s))
+    \end{array}
+  \]
+
 \begin{proof}
-  The goal is:
-  \[
-  \wpre{\syn{las\_vegas}(sd, init, test)}
-    {\lambda \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n)}.
-  \]
-  We reason through the definition step by step.
-
-  \textbf{Step 1: Create and seed the generator.}
-  Apply \textsc{WP-PRNG-NEW} to allocate a fresh generator \(r\).
-  This gives \(\knownprng(r)\) and updates the PRNG ghost state.
-  Then apply \textsc{WP-ALLOC} (the store allocation rule) to allocate
-  a heap cell \(s\) containing \(\gRet(init)\), giving the points-to
-  predicate \(s \pointsto init\).  By \textsc{WP-SEQ} followed by
-  \textsc{WP-PRNG-SEED}, we seed the generator with \(sd\).  The goal
-  reduces to proving the while-loop:
-  \[
-  \wpre{\gwhile\;(\mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s))
-                 \;(\mathrm{LET}\;(\mathrm{PRNG\_GEN}\;r)\;(\mathrm{WRITE}\;s))}
-        {\lambda \_.\; \wpre{\mathrm{READ}\;s}
-          {\lambda \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n)}}.
-  \]
-
-  \textbf{Step 2: L\"ob induction.}
-  Since \(\gwhile\) is defined via guarded recursion, we use L\"ob
-  induction.  Assume the induction hypothesis:
-  \[
-  \IH \equiv \later\wpre{\gwhile\;(\cdots)}{ \lambda \_.\;
-    \wpre{\mathrm{READ}\;s}{\lambda \beta.\; \exists n.\;
-      \beta \equiv \gRet(n) \land f(n)} }.
-  \]
-  Unfolding \(\gwhile\):
-  \[
-  \gwhile(\alpha)(\beta) \equiv
-    \gif(\alpha)(\beta \cbvap \Tick(\gwhile(\alpha)(\beta)))(\gRet(())).
-  \]
-  Here \(\alpha \eqdef \mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s)\)
-  and \(\beta \eqdef \mathrm{LET}\;(\mathrm{PRNG\_GEN}\;r)\;
-  (\mathrm{WRITE}\;s)\).
-
-  \textbf{Step 3: Read and test.}
-  Apply \textsc{WP-READ} to read the current value \(n\) from the store
-  cell \(s\), preserving \(s \pointsto n\).  The test predicate
-  \(test\) satisfies:
-  \[
-  \forall n.\; \wpre{test \cbvap \gRet(n)}
-    {\lambda \gamma.\; \gamma \equiv \gRet(1) \lor
-                      \gamma \equiv \gRet(0)}.
-  \]
-  Applying the test to \(n\) and using \(\mathrm{neg\_bool}\), the
-  condition \(\alpha\) evaluates to either \(\gRet(0)\) (test passed)
-  or \(\gRet(1)\) (test failed).  We perform case analysis.
-
-  \textbf{Step 4: Case analysis on the test outcome.}
-  \begin{itemize}
-    \item \textbf{Test passed} (\(f(n)\) holds): then
-      \(\alpha \equiv \gRet(0)\) and the \(\gif\) reduces to
-      \(\gRet(())\).  By the sequencing rule we proceed to
-      \(\mathrm{READ}\;s\), which returns \(n\).  This satisfies
-      the post-condition with witness \(n\) since \(f(n)\) holds.
-
-    \item \textbf{Test failed} (\(f(n)\) does not hold): then
-      \(\alpha \equiv \gRet(1)\) and the \(\gif\) reduces to
-      \(\beta \cbvap \Tick(\gwhile(\alpha)(\beta))\).
-      Applying the CBV application rule, we execute
-      \(\mathrm{LET}\;(\mathrm{PRNG\_GEN}\;r)\;(\mathrm{WRITE}\;s)\):
-      \textsc{WP-PRNG-GEN} samples a fresh number \(m\) from the
-      generator, and \textsc{WP-WRITE} stores \(m\) into the cell \(s\),
-      updating the points-to predicate to \(s \pointsto m\).
-      A tick step discharges the \(\later\) in the induction hypothesis
-      \(\IH\), which we apply with the updated state to complete the
-      loop iteration.
-  \end{itemize}
-  Throughout, the GItree equational theory and homomorphism rules are
-  used to expose head-normal forms for symbolic execution.
+  The idea is to repeatedly step the GItree with symbolic execution proof rules and handle the loop with L\"ob induction.
+  We should use the implicit state rules since the effect reifier states are wrapped in invariants.
+  \newcommand{\contd}{\syn{\boxed{\cdots}}}
+  \begin{enumerate}
+    \item Unfold the definition of \(\syn{las\_vegas}\).
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \proves \wpre{\{ \mathrm{PRNG\_NEW}\;(\lambda r.\mathrm{ALLOC}\;(\gRet(init))\;(\lambda s. \contd{})) \}}
+          {\beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+    \item Allocation with \textsf{WP-PRNG-NEW} and \textsf{WP-ALLOC}.
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \proves \wpre{\{ \mathrm{PRNG\_SEED}\;r\;sd; \contd{} \}}
+          {\beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+    \item \(-;\;e_2\) is a GItree homomorphisms. Apply \textsf{WP-BIND}.
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \proves \wpre{\{ \mathrm{PRNG\_SEED}\;r\;sd \}}
+          {\_.\; \wpre{\contd{}}{ \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}}
+        \end{array}
+      \]
+    \item Update the PRNG seed with \textsf{WP-SEED}.
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \proves \wpre{\{ \gwhile\;(\mathrm{neg\_bool}\; (test \cbvap \mathrm{READ}\;s))\; (\contd{}); \mathrm{READ}\;s\}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+    \item Apply the L\"ob rule with \(init\) generalized.
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \later \forall i.\; s \pointsto \gRet(i) \wand \wpre{\contd{}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}} \\
+          \proves \wpre{\{ \gwhile\;(\mathrm{neg\_bool}\; (test \cbvap \mathrm{READ}\;s))\; (\contd{}); \mathrm{READ}\;s\}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+    \item \(\gwhile\) is a guarded fixed point validating the following equation
+      \[
+        \forall \alpha,\beta.\;
+        \gwhile\;\alpha\;\beta \equiv
+        \gif\;\alpha\;(\beta;\;\Tick(\gwhile\;\alpha\;\beta))\; \gRet(())
+      \]
+      Apply \textsf{WP-BIND} to evaluate \(\mathrm{neg\_bool}\; (test \cbvap \mathrm{READ}\;s)\) first.
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \later \forall i.\; s \pointsto \gRet(i) \wand \wpre{\contd{}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}} \\
+          \proves \wpre{\{ \mathrm{neg\_bool}\; (test \cbvap \mathrm{READ}\;s) \}}
+          {\gamma.\;
+            \wpre{\gif\;\gamma\;\contd{}\;\gRet(())}
+              {\beta.\;\exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}} }
+        \end{array}
+      \]
+    \item Apply \textsc{WP-READ} to read the from the store cell \(s \pointsto \gRet(init)\).
+      Perform a case analysis on \(f(init)\).
+    \item Case \(f(init) = \mathbf{T}\).
+      Show that the branch condition evaluates to \(\gamma = \gRet(0)\), using the specification of \(\mathrm{neg\_bool}\) and \(test\).
+      Rewrite with the following equation for \(\gif\)
+      \[
+        \forall \alpha,\beta.\; \gif\;(\gRet(0))\;\alpha\;\beta \equiv \beta
+      \]
+      The remaining proof goal
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \later \forall i.\; s \pointsto \gRet(i) \wand \wpre{\contd{}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}} \\
+          \proves \wpre{\mathrm{READ}\;s}{\beta.\;\exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+      Apply \textsf{WP-READ} to complete this case.
+    \item Case \(f(init) = \mathbf{F}\).
+      Show that the branch condition evaluates to \(\gamma = \gRet(1)\), using the specification of \(\mathrm{neg\_bool}\) and \(test\).
+      Rewrite with the following equation for \(\gif\)
+      \[
+        \forall \alpha,\beta.\; \gif\;(\gRet(1))\;\alpha\;\beta \equiv \alpha
+      \]
+      The remaining proof goal
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(init) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \later \forall i.\; s \pointsto \gRet(i) \wand \wpre{\contd{}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}} \\
+          \proves \wpre{\{ \mathrm{LET} \;x = \mathrm{PRNG\_GEN}\; r\ \mathrm{in}\ \mathrm{WRITE} \;s \;x; \contd{} \}}
+          {\beta.\;\exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+      Apply \textsf{WP-PRNG-GEN} to generate a number, denoted by \(n\).
+      Apply \textsf{WP-STORE} to write \(\gRet(n)\) into \(s\).
+      In a later step, one has to show
+      \[
+        \begin{array}{l}
+          \heapCtx \sep \prngCtx \sep \knownprng(r) \sep s \pointsto \gRet(n) \\
+          \persistently\left(
+            \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+            {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+          \right) \\
+          \forall i.\; s \pointsto \gRet(i) \wand \wpre{\contd{}}
+          { \beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}} \\
+          \proves \wpre{ \contd{} }{\beta.\;\exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+        \end{array}
+      \]
+      Apply the induction hypothesis, which becomes available since we go under a later modality, to complete the proof.
+  \end{enumerate}
 \end{proof}
 
 It is worth mentioning that the effect signature can be given alternative semantics. More specifically, it can be reified as non-deterministic choice or sampling from a discrete probabilistic distribution. Depending on how the effect is how the effect is interpreted, different program logics rule can be derived, enabling reasoning about GItree programs that involves non-determinism or probabilistic behavior. Unfortunately, these two alternative reifications cannot be implemented in the current formalization since reifiers have to be a Rocq function, which is pure and total.\par
@@ -1477,7 +1580,6 @@ As a direct result, we have the following theorem:
 
 The computational adequacy theorem is derived by specializing the fundamental theorem with \(\Gamma = \bullet\) and \(\type = \tnat\).
 
-% TODO: we are here ...
 \subsection{An incomplete proof for type safety}
 
 As hinted at the beginning of this subsection, we can investigate properties of \(\lambda_\prng\) by operating at the level of GItree denotational semantics, circumventing the operational semantics of the language. We showcase this approach with a partial proof of the type safety of \(\lambda_\prng\).\par
@@ -1526,9 +1628,9 @@ This is because that all the information about the execution of \(e\) is in the 
 Indeed, in the presence of general recursion, we have no hope of proving the termination of \(\sem{e}\) from the weakest precondition.\par
 
 To complete the proof, we would need the soundness of the GItree program logic, specialized to the denotation of \(\lambda_\prng\) programs, with respect to the operational semantics of \(\lambda_\prng\).
-This is the kind of adequacy theorems discussed in program logics \`a la carte\cite{proglog-carte}.
+This is the kind of adequacy theorems discussed in the \emph{program logics \`a la carte} paper~\cite{proglog-carte}.
 The research paper proposed a modular approach of building program logic for effectful languagees.
-In their settings, they define \(\wpre{e}{\Phi}\) as \(\wpre{\sem{e}}{\Phi}\) where \(\sem{\cdot}\) interprets programs as interaction trees\cite{itrees}. By doing so, the equational theory of ITrees and various effect theories can be reused to build program logic for different languages.
+In their settings, they define \(\wpre{e}{\Phi}\) as \(\wpre{\sem{e}}{\Phi}\) where \(\sem{\cdot}\) interprets programs as interaction trees~\cite{itrees}. By doing so, the equational theory of ITrees and various effect theories can be reused to build program logic for different languages.
 Whenever a program logic is defined, an adequacy theorem linking \(\wpre{\sem{e}}{\Phi}\) with the operational semantics of \(e\) has to be established.
 To the best of our knowledge, no similar experimentation has been done for guarded interaction trees.
 
