@@ -130,7 +130,9 @@ The project was carried out in four phases:
   \item In the preparation phase, I familiarized myself with writing formal proof using the Iris higher-order separation logic framework within the Rocq proof assistant.
   \item Subsequently, I studied the two research papers on guarded interaction trees~\cite{esop25git-callcc,popl24gitree} to learn the general theory of GItrees. I learned using GItrees to interpret programs involving higher-order effects.
   \item Afterwards, I proposed and completed a case study on interpreting pseudo-randomness as an effect in GItrees. I designed a simple programming language with pseudo-random number generator functionality and developed a denotational semantics based on GItrees for proving safety and contextual equivalence.
-    The results have been mechanized in Rocq as an extension to the GItree Rocq formalization\footnote{The Rocq development is available at \url{https://github.com/logsem/gitrees/pull/6}}.
+    The results have been mechanized in Rocq as an extension to the GItree Rocq formalization\footnote{The Rocq development is available at \url{https://github.com/logsem/gitrees/pull/6}
+      See also Table~\ref{tab:formal}.
+    }.
   \item In the final stage, I experimented with modeling and reasoning about interactions between controller programs and physical devices, which is common in Internet of Things (IoT) applications.
 \end{enumerate}
 
@@ -138,6 +140,19 @@ The current document summarizes my learning outcomes and preliminary exploration
 (1) to provide a summary of my work for examination;
 (2) to articulate initial observations and insights for further discussion; and
 (3) to serve as a tutorial for people to get started on guarded interaction trees.\par
+
+\begin{table*}
+  \caption{Formalization efforts}\label{tab:formal}
+  \begin{tabular}{ccl}
+    \hline
+    Informal exhibition & Rocq formalization & Remarks \\
+    \hline
+    this def & this proof & () \\
+    % TODO: summarize results
+    \hline
+  \end{tabular}
+\end{table*}
+
 
 \section{Backgrounds}
 
@@ -643,8 +658,8 @@ However, it is often desirable to reason about effects with partial knowledge of
 Currently, we cannot derive the following \textsf{WP-READ} and \textsf{WP-WRITE} rules for the higher-order store effect:
 
 \begin{mathpar}
-  \inferrule[wp-read']{l\pointsto \alpha \\ \later (l\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{!l}{\Phi}}
-  \and \inferrule[wp-store']{l\pointsto \alpha \\ \later (l\pointsto \beta \wand \Phi(\gRet()))}{\wpre{l\gets \beta}{\Phi}}
+  \inferrule[wp-read']{l\pointsto \alpha \\ \later (l\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{(!l)}{\Phi}}
+  \and \inferrule[wp-store']{l\pointsto \alpha \\ \later (l\pointsto \beta \wand \Phi(\gRet()))}{\wpre{(l\gets \beta)}{\Phi}}
 \end{mathpar}
 
 To recover this kind of reasoning principles, one has to design an accompanying ghost theory, which will be exemplified later sections.\par
@@ -1043,8 +1058,8 @@ Another set of rules with the explicit ownership of the full state threaded thro
 Similarly, two proof rules for the higher-order store effect can be derived.
 
 \begin{mathpar}
-  \inferrule[wp-read]{\heapCtx \\ l\pointsto \alpha \\ \later (l\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{!l}{\Phi}}
-  \and \inferrule[wp-store]{\heapCtx \\ l\pointsto \alpha \\ \later (l\pointsto \beta \wand \Phi(\gRet()))}{\wpre{l\gets \beta}{\Phi}}
+  \inferrule[wp-read]{\heapCtx \\ l\pointsto \alpha \\ \later (l\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{(!l)}{\Phi}}
+  \and \inferrule[wp-store]{\heapCtx \\ l\pointsto \alpha \\ \later (l\pointsto \beta \wand \Phi(\gRet()))}{\wpre{(l\gets \beta)}{\Phi}}
 \end{mathpar}
 
 
@@ -1226,16 +1241,20 @@ To conclude this part, we showcase a proof that the Las Vegas GItree program alw
           \proves \wpre{ \contd{} }{\beta.\;\exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
         \end{array}
       \]
-      Apply the induction hypothesis, which becomes available since we go under a later modality, to complete the proof.
+      Now we are under at least one later modality, the induction hypothesis becomes available.
+      The first iteration of the while loop is completed and the remaining program matches with the induction hypothesis.
+      Apply IH with \(i = n\) to complete this case.
   \end{enumerate}
 \end{proof}
 
-It is worth mentioning that the effect signature can be given alternative semantics. More specifically, it can be reified as non-deterministic choice or sampling from a discrete probabilistic distribution. Depending on how the effect is how the effect is interpreted, different program logics rule can be derived, enabling reasoning about GItree programs that involves non-determinism or probabilistic behavior. Unfortunately, these two alternative reifications cannot be implemented in the current formalization since reifiers have to be a Rocq function, which is pure and total.\par
-Finally, we mention that the implicit state WP rules is sound for all three possible reifications as it requires the program continue execution safely regardless of the number being generated. Programs that are proven to be safe with this set of rules are safe no matter how we choose to interpret the effect. Specifically, the Las Vegas program will remain to be safe if we replace the PRNG reifier with a probabilistic sampling reifier.
 
 \subsection{Interpreting \(\lambda_\prng\) in guarded interaction trees}
 
-Now that a theory of PRNG effects is in place, we can give a denotational semantics of \(\lambda_\prng\) by interpreting \(\lambda_\prng\) programs as GItrees with PRNG effects. We define a map \(\sem{-}_\senv\) from \(\lambda_\prng\) expresisions to \(\IT_{\prng}(\mathbf{1} + \mathbb{N} + \iLoc)\), where \(\senv:\iVar \to \IT\) is a substitution environment for free variables. The interpretation is depicted in the following figure and should be straight-forward.
+Now that a theory of PRNG effects is in place, we can give a denotational semantics of \(\lambda_\prng\) by interpreting programs as GItrees with PRNG effects.
+Let \(E\) be an effect signature such that \(\prng\subeff E\), \(A\) be a type such that \(A \cong \mathbf{1} + \mathbb{N} + \iLoc + B\) for some \(B\).
+We can define a map \(\sem{-}_\senv\) from \(\lambda_\prng\) expresisions to \(\IT_{E}(A)\), where
+\(\senv:\iVar \to \IT\) is a substitution environment for free variables.
+The interpretation is depicted in the following figure and should be straight-forward.
 \[
   \begin{aligned}
     \sem{\vunit}_\senv &\eqdef \gRet(())
@@ -1247,7 +1266,7 @@ Now that a theory of PRNG effects is in place, we can give a denotational semant
     \sem{\eapp{e_1}{e_2}}_\senv &\eqdef \sem{e_1}_\senv \cbvap \sem{e_2}_\senv \\
     \sem{\recval{f}{x}{\expr}}_\senv
                   &\eqdef \fix\;\lambda (\alpha : \latert \IT).\; 
-                  \gFun\left(\later\!\circ\!\left(\lambda \alpha'\;v.\;
+                  \gFun\left(\latert\!\circ\!\left(\lambda \alpha'\;v.\;
                   \sem{\expr}_{\senv[x\mapsto v,\;f\mapsto \alpha']}\right)(\alpha)\right) \\
     \sem{\kw{NewPrng}}_\senv &\eqdef \mathrm{PRNG\_NEW}\;\gRet \\
     \sem{\kw{DelPrng}\;e}_\senv &\eqdef \getret(\mathrm{PRNG\_DEL})(\sem{e}_\senv) \\
@@ -1256,8 +1275,8 @@ Now that a theory of PRNG effects is in place, we can give a denotational semant
   \end{aligned}
 \]
 
-where \(\fix : \latert \IT \to \IT\) is the guarded fixed point combinator;
-\(\later\!\circ\) transforms the function of type \(\IT \to (\IT \to \IT)\) into \(\latert \IT \to \latert (\IT \to \IT)\) so that \(t : \latert \IT\) can be applied;
+Here \(\fix : \latert \IT \to \IT\) is the guarded fixed point combinator;
+\(\latert\!\circ\) transforms the function of type \(\IT \to (\IT \to \IT)\) into \(\latert \IT \to \latert (\IT \to \IT)\) so that \(t : \latert \IT\) can be applied;
 and \(\mathrm{SeedGit} : \IT \to \IT \to \IT\) is a derived GItree combinator that evaluates the two arguments from right to left before passing them to \(\mathrm{PRNG\_SEED}\).
 
 % goal : [IT]
@@ -1267,7 +1286,7 @@ and \(\mathrm{SeedGit} : \IT \to \IT \to \IT\) is a derived GItree combinator th
 % 4. introduce [v : IT], construct [IT]
 % 5. interpret [e] under environment with [x -> v, f -> t']
 
-We also interpret evaluation contexts as functions \(\IT\to\IT\).
+We also interpret \(\lambda_\prng\) evaluation contexts as GItree homomorphisms \(\IT\to\IT\).
 
 \[
   \begin{aligned}
@@ -1283,14 +1302,23 @@ We also interpret evaluation contexts as functions \(\IT\to\IT\).
     \sem{\kw{Seed}\;v\;K}_\senv(\alpha) &\eqdef \mathrm{SeedGit}\;(\sem{v}_\senv)\;(\sem{K}_\senv(\alpha))\\
   \end{aligned}
 \]
+Recall that GItree homomorphisms are GItree evaluation contexts in the operational semantics of GItrees.
+In other word, under the denotational semantics,
+not only \(\lambda_\prng\) do programs becomes GItree programs,
+\(\lambda_\prng\) evaluation contexts also corresponds to evaluation contexts.\par
 
-We can show that \(\sem{K[e]} \equiv \sem{K}(\sem{e})\), which means our interpretation is compositional.
-Using the GItree combinator equational reasoning rules, we can prove that \(\lambda_\prng\) evaluation contexts corresponds to GItree evaluation contexts, i.e., GItree homomorphisms.\par
+We note that our interpretation is compositional. That is, given a context \(C\), which is not necessarily an evaluation context, the following equivalence holds.
+\[
+  \forall e_1,e_2.\;
+  \sem{e_1}_\senv \equiv \sem{e_2}_\senv
+  \implies
+  \sem{C[e_1]}_\senv \equiv \sem{C[e_2]}
+\]
 
-
-Having defined an interpretation of \(\lambda_\prng\) programs in terms of GItrees,
-we would like to show that \(\sem{e}\) faithfully and adequately captures the operational semantics by relating the execution of \(e\) and the reduction of \(\sem{e}\),
-which will allow us to leverage the interpretation to prove semantical properties, e.g. type safety and contextual refinement, without directly working on the operational semantics.\par
+Having defined a translation from \(\lambda_\prng\) to GItrees,
+we would like to show that \(\sem{\cdot}\) faithfully and adequately captures the operational semantics of \(\lambda_\prng\).
+More specifically, for a \(\lambda_\prng\) program \(e\), the execution of \(e\) should relate to the reduction of \(\sem{e}\),
+which will allow us to leverage the interpretation to prove semantical properties, e.g. type safety and contextual refinement, without directly working on the operational semantics of \(\lambda_\prng\).\par
 
 Our first result is the soundness of this denotational interpretation, which can be proved directly by induction.
 \begin{theorem}[Soundness of the GItree interpretation for \(\lambda_\prng\)]
@@ -1582,7 +1610,9 @@ The computational adequacy theorem is derived by specializing the fundamental th
 
 \subsection{An incomplete proof for type safety}
 
-As hinted at the beginning of this subsection, we can investigate properties of \(\lambda_\prng\) by operating at the level of GItree denotational semantics, circumventing the operational semantics of the language. We showcase this approach with a partial proof of the type safety of \(\lambda_\prng\).\par
+As hinted at the beginning of this section, we would like to investigate semantic properties of \(\lambda_\prng\) by working at the level of GItree denotational semantics, circumventing the operational semantics of the language.
+We will showcase this approach with a partial proof of the type safety of \(\lambda_\prng\).
+As we will see, the proof cannot be completed, exposing a limination of the GItree program logic.\par
 
 Let \(\typed{\bullet}{e}{\tau}\) be a well-typed closed program.
 We apply the fundamental lemma to show \(\mathcal{E}_\tau(\sem{e},e)\), which expands to the following proposition:
@@ -1634,60 +1664,70 @@ In their settings, they define \(\wpre{e}{\Phi}\) as \(\wpre{\sem{e}}{\Phi}\) wh
 Whenever a program logic is defined, an adequacy theorem linking \(\wpre{\sem{e}}{\Phi}\) with the operational semantics of \(e\) has to be established.
 To the best of our knowledge, no similar experimentation has been done for guarded interaction trees.
 
-\section{Modeling interactions with physical devices}
-
-% TODO: expand ... explain how this is a generalization of the 
-
 \section{Discussion and Future Works}
 
-This project has explored the application of guarded interaction trees as a semantic domain for effectful higher-order languages. Specifically, we have developed a computationally adequte denotational semantics for a functional language equipped with PRNG effects.\par
+In this project, we explored the application of guarded interaction trees as a semantic domain for effectful higher-order languages.
+A GItree effect theory for pseudo-randomness and a computationally adequate denotational semantics for \(\lambda_\prng\), a functional language equipped with PRNG effects, are developed.
+While being successful overall, the project has several difficulties that are not satisfyingly addressed and some potentials that are not completely examined.
 
-While the project is overall successful, my solution to several technical difficulties are not completely satisfying and requires future refinement.
+\subsection{Modeling richer interactions}
+
+Looking forward, the GItree framework provides a promising substrate for reasoning about cyber-physical systems.
+In the future, we would like to extend the framework to enable modeling rich interaction between programmed controller and physical devices, in the presence of real-time constraints, non-deterministic responses, and probabilistic reactions.
+Physical devices are essentially random number generators whose behaviors can be approximated and partially predicted by automata models.\par
+The first step towards this goal is to give alternative reification to the PRNG effect signature.
+One can observe that the signature itself is sufficient to model deterministic (pseudo-random), stochastic, and non-determinism processes.
+Therefore, it should be possible to reify the effect as non-deterministic choice or sampling from a discrete probabilistic distribution. Depending on how the effect is how the effect is implemented, different program logics rule can be derived, enabling reasoning about non-deterministic and/or stochastic GItrees. Unfortunately, these two alternative reifications cannot be defined in the current framework since a reifier is a Rocq function, which is always pure and total.\par
+With that said, the implicit state rules, i.e. \textsf{WP-PRNG-NEW}, \textsf{WP-PRNG-SEED}, and \textsf{WP-PRNG-GEN}, are sound for pseudo-random, non-deterministic and probabilistic number generators. These rules require that the program can be executed safely regardless of the number being generated. Programs that are proven to be safe with this set of rules are safe no matter how we choose to interpret the effect. Specifically, the partial correctness proof of Las Vegas program will remain to be sound if we replace the PRNG reifier with a probabilistic sampling reifier.\par
+
+There are multiple ways to generalize the GItree theory to lift the aforementioned limitation:
 
 \begin{enumerate}
-  \item The computational adequacy result is not strong enough.
-    From \(\sem{e}\Redu^\ast (\gRet(n),\sigma')\), one can derive \((e,\sigma) \redu^\ast (n,\sigma')\) but gains no knowledge on how \(\sigma\) evolves to \(\sigma'\).
-    This will be insufficient when one want to prove semantic properties involving observation of the state during the execution.
-    For instance, program indistinguishability cannot be proved if the threat model allows the attack to inspect the store during program execution.
-    % TODO: rephrase this.
-    % It can be difficult to do so. But we probably imagine it impossible.
-    % frame this thing as: some strengthening is needed before we can use this theorem to prove indistinguishability stuff.
-    % some full-abstraction results
-  \item While the effect interpretations and program logic rules are modularly defined,
-    the effectful programming language itself is not constructed in a modular approach.
-    As a result, one cannot easily construct a language integrating I/O tape, higher-order store and PRNG by piecing three languages together.
-  \item \(\syn{SEED}\) is an operator taking more than one argument.
-    It is tricky to find a appropriate GItree interpretation that reduces generate only a single tick.
-  \item No program logic rules is derived for \(\mathrm{PRNG\_DEL}\), and no typing rule is defined for \(\syn{DelPrng}\).
-    The root cause is that no restriction on sharing of generators is imposed.
-    The benefit of this design is that \(\knownprng(\ell)\) becomes persistent so proofs were mostly straight-forward, however, it indeed limits the expressiveness of our program logic.
-    One way to lift this limitation is to use fractional ownership, but I haven't experimented with that.
-    Once a finer effect theory is developed, one can experiment proving soundness of a qualitative type system for \(\lambda_\prng\), which allows deletion of exclusively owned generators.
-  \item An alternative way of building the PRNG effect is to reuse the higher-order store effect.
-    I explored this approach initially but abandoned it later for technical difficulties.
-  \item I didn't experiment interpreting the effect as non-deterministic or probabilistic generation.
-  \item Weaker bisimulation of GItrees as a more helpful equivaleence notion.
-    pertaining to the previous point of multiple ticks.
-  \item less ideal effect handling ...
-    Unify SubOfe, SubEff, and SubReifiers.
-
+  \item Define a reifier as a binary relation over \((\IT,State)\) with richer information (probability, weight, etc).
+    The resulting theory is more operational in the sense reasoning about GItrees will be carried out in an operational style.
+  \item Define a reifiers as an monadic function and endow GItrees with trace semantics.
+    This approach likely gives a more denotational theory.
 \end{enumerate}
 
-Looking forward, the GItree framework provides a promising substrate for reasoning about cyber-physical systems. Future works could investigate the modeling and reasoning of interaction between controllers and physical devices, in the presence of real-time constraints, non-deterministic responses, and probabilistic actions.
-As explained before, the theory of GItrees has to be generalized to allow defining reifiers as not merely a function in the metatheory. This will require rephrasing great part of existing works either in written down informally on paper or formalized in Rocq.
-There are multiple ways to extend the theory, and it is unclear which one would be optimal:
-(1) One can change reifiers to a binary relation over \((\IT,State)\) with richer information. The resulting theory is more operational in the sense reasoning about GItrees will be carried out in an operational style.
-(2) One can allow defining reifiers as an monadic function and endow GItrees with trace semantics. This approach likely gives a more denotational theory.
+It is currently unclear whether these approaches are feasible.
 
-\section{formalization efforts}
+\subsection{Applicative bisimulation for GItrees}
+
+We would like to develop a bismulation for identifying GItrees that have essentially the same behavior but differs in the number of \(\Tick\)s takes to evaluate them.
+More formally, we want to define a binary relation \(\sim : \IT_{E}(A) \times \IT_{E}(A)\) validating the following rules:
+
+\begin{mathpar}
+  \inferrule{ }{\alpha \sim \alpha}
+  \and \inferrule{\alpha \sim \beta}{\beta \sim \alpha}
+  \and \inferrule{\alpha \sim \beta \\ \beta\sim \gamma}{\alpha \sim \gamma}\\
+  \inferrule{\alpha \sim \Tick(\beta)}{\alpha \sim \beta}
+  \and \inferrule{\forall \alpha.\; f~\alpha \sim g~\alpha}{\gFun(f) \sim \gFun(g)}
+  \and \inferrule{x \sim y \\ \forall \beta.\; f~\beta \sim g~\beta}{\gVis_i(x,k) \sim \gVis_i(y,g)}
+\end{mathpar}
+
+Ideally, we would like to re-develop the binary logical relation for representation independence in Timany et al.~\cite{jacm-logrel} for GItrees.
+However, this is not possible due to the lack of the \emph{existential property}. Some discussion on this issue can be found in Sergei Stepanenko's PhD thesis~\cite{stepanenko2025formal}.
+
+\subsection{Full abstraction for GItree-based denotational semantics}
+
+The GItree denotational interpretation of \(\lambda_\prng\) is fairly intensional.
+We would like to see whether it is fully abstract.
+
+\subsection{Comparing GItree and SGDT}
+
+Various semantic domains have been developed in intensional Guarded Dependent Type theory (iGDTT).
+Paviotti et al.~\cite{paviotti2015model,mogelberg2016denotational} defined computationally adequate denotational semantics for PCF and FPC based on the guarded delay monad.
+M{\o}gelberg et al.~\cite{mogelberg2021two} defined powerdomains for modeling non-determinism. Stanssen et al.~\cite{stassen2025modelling} proposed an interpretation of probabilistic FPC in the domain of guarded convex delay algebras.
+It would be interesting to compare SGDT-based denotational semantics and GItree-based denotational semantics.
 
 \section{Declaration on Generative AI usage}
 
-In the report write-up phase, I used Generative AI to create proof trees from formal proofs mechanized in Rocq.
+Generative AI is employed in the report write-up phase of this project.
+I used GAI for proofreading and polishing. Some informal proofs in the report are created by asking GAI to translate mechanized Rocq proofs.
 
-\section{acknowledgement}
+\section{Acknowledgement}
 
-We thank Sergei for discussion and some assistance in writing and proofreading.
+Special thanks to Sergei Stepanenko for discussion and proofreading.
 
 \nocite{*}
 \printbibliography
