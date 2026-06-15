@@ -130,9 +130,7 @@ The project was carried out in four phases:
   \item In the preparation phase, I familiarized myself with writing formal proof using the Iris higher-order separation logic framework within the Rocq proof assistant.
   \item Subsequently, I studied the two research papers on guarded interaction trees~\cite{esop25git-callcc,popl24gitree} to learn the general theory of GItrees. I learned using GItrees to interpret programs involving higher-order effects.
   \item Afterwards, I proposed and completed a case study on interpreting pseudo-randomness as an effect in GItrees. I designed a simple programming language with pseudo-random number generator functionality and developed a denotational semantics based on GItrees for proving safety and contextual equivalence.
-    The results have been mechanized in Rocq as an extension to the GItree Rocq formalization\footnote{The Rocq development is available at \url{https://github.com/logsem/gitrees/pull/6}
-      See also Table~\ref{tab:formal}.
-    }.
+    The results have been mechanized in Rocq as an extension to the GItree Rocq formalization\footnote{The Rocq development is available at \url{https://github.com/logsem/gitrees/pull/6}}.
   \item In the final stage, I experimented with modeling and reasoning about interactions between controller programs and physical devices, which is common in Internet of Things (IoT) applications.
 \end{enumerate}
 
@@ -140,18 +138,6 @@ The current document summarizes my learning outcomes and preliminary exploration
 (1) to provide a summary of my work for examination;
 (2) to articulate initial observations and insights for further discussion; and
 (3) to serve as a tutorial for people to get started on guarded interaction trees.\par
-
-\begin{table*}
-  \caption{Formalization efforts}\label{tab:formal}
-  \begin{tabular}{ccl}
-    \hline
-    Informal exhibition & Rocq formalization & Remarks \\
-    \hline
-    this def & this proof & () \\
-    % TODO: summarize results
-    \hline
-  \end{tabular}
-\end{table*}
 
 
 \section{Backgrounds}
@@ -170,20 +156,19 @@ Readers who are unfamiliar with Iris may consult the Iris lecture notes~\cite{ir
 \subsubsection{Synthetic step-indexing}
 Step-indexing techniques were introduced to model general recursion and recursive types.
 Iris internalizes step-indexing via the later modality (\(\later\)) to avoid explicit step arithmetic and inequality side conditions.
-In iris, recursive propositions, notably the weakest preconditions, can be defined by guarded recursion, which is justified by a variant of the Banach's fixedpoint theorem.
+In Iris, recursive propositions, notably the weakest preconditions, can be defined by guarded recursion, which is justified by a variant of the Banach's fixedpoint theorem.
 To prove a recursively defined proposition, one utilizes the L\"ob rule, which amounts to induction on the underlying step-index.
 \begin{mathpar}
   \inferrule[\(\later\)-mono]{P\vdash Q}{\later P \vdash \later Q}
-  \and \inferrule[\(\later\)-mono]{P\vdash Q}{\later P \vdash \later Q}
   \and \inferrule[\(\later\)-weak]{P\vdash Q}{P \vdash \later Q}
   \and \inferrule[t-fix]{\typed{\Gamma,x:\tau}{t}{\tau} \\ \text{variable \(x\) can only appear in \(t\) under \(\later\)}}{\typed{\Gamma}{\mu x . t}{\tau}}
   \and \inferrule[eq-fix]{ }{\typed{\Gamma}{\mu x .\; t = \subst{t}{x}{(\mu x .\; t)}}{\tau}}
   \and \inferrule[L\"ob]{ }{\later P \Rightarrow P \vdash P}
 \end{mathpar}
 The idea of having a modality for recursion appears to be invented by Nakano~\cite{nakano-grec}, though the terminology and notations differ from that of Iris.
-The familiar was Birkedal et al.~\cite{birkedal2012first} proposed the synthetic step-indexing technique in its current form one can found in Iris.
+The now-familiar synthetic step-indexing which one finds in Iris was proposed in Birkedal et al.~\cite{birkedal2012first}.
 In their paper, the \emph{topos of trees}, i.e. the category of presheaves on the first infinite ordinal, was identified as a model of synthetic guarded domain theory (SGDT).
-The topos of tree gives rise to an intuitionistic higher-order logic with the later modality and a dependent type theory with a later operator.
+The topos of trees gives rise to an intuitionistic higher-order logic with the later modality and a dependent type theory with a later operator.
 Following their work, many dependent type theories have been developed~\cite{birkedal2013intensional,bizjak2016guarded,birkedal2019guarded} to extend SGDT.
 Iris borrowed heavily from SGDT, even though the model of Iris is not based on the topos of trees or its generalizations.
 
@@ -205,7 +190,7 @@ one can apply the America and Rutten’s theorem to construct the unique solutio
 As a separation logic, Iris admits the weakening structural rule but limits the contraction rule to persistent propositions.
 That is, Iris propositions are generally non-duplicable but can be discarded freely.
 As a result, they are well-suited for modeling affine resource ownership, which is ubiquitous in programming languages.
-Moreover, reasoning and manipulation or resources in Iris are localized.
+Moreover, reasoning and manipulation of resources in Iris are localized.
 For example, to update a specific heap cell, one do not need to consider the state of the entire heap.
 This informal and intuitive idea is captured by the frame rule and the \emph{frame-preserving updates} discipline, the enabler of modular proofs.
 The proof rules are justified by the semantic interpretation of Iris propositions as step-indexed subsets of resources that are
@@ -233,9 +218,9 @@ After each atomic access, the invariant must be restored, reflecting the intuiti
 \subsubsection{Custom resource algebras}
 Arguably the most powerful feature of Iris is the ability for users to extend the logic by defining new resource algebras.
 Iris uses ghost states over resource algebras to keep track of physical and logical states of programs to facilitate reasoning.
-As demonstrated in by Jung et al.~\cite{iris3}, many fundamental concepts in concurrent separation logic do not have to be introduced as primitives,
+As demonstrated by Jung et al.~\cite{iris3}, many fundamental concepts in concurrent separation logic do not have to be introduced as primitives,
 instead they can be defined as ghost ownership of carefully crafted resource algebras.
-Instance of which includes the points-to predicate, and (surprisingly) invariants.
+Instances include the points-to predicate, and (surprisingly) invariants.
 \begin{mathpar}
   \inferrule[valid-alloc]{a \in \mathcal{V}_M}{\TRUE \vdash \pvs \exists \gamma .\; \ownGhost{\gamma}{a}}
   \and \inferrule[own-valid]{ }{\ownGhost{\gamma}{a} \vdash a \in \mathcal{V}_M}
@@ -248,7 +233,7 @@ The Iris Rocq development ships with a bunch of reusable resource algebra combin
 \subsection{The logical relations proof method}
 
 Logical relations is a prominent method to proving semantic properties for typed programming languages.
-The flexible method can be used to establish soundness of a type system i.e. execution of well-typed programs never get stuck or result in an errorneous state or investigate specific programs, for example, proving a program safely encapsulate unsafe operations or proving contextual equivalence of two programs.
+The flexible method can be used to establish soundness of a type system i.e. execution of well-typed programs never gets stuck or result in an errorneous state or investigate specific programs, for example, proving a program safely encapsulate unsafe operations or proving contextual equivalence of two programs.
 Due to limited time for writing, we cannot include a full introduction to the proof methods in this report.
 Readers who do not have sufficient knowledge of logical relations can read Skorstengaard's excellent tutorial~\cite{skorstengaard2019logical}. The semantics course note by Dreyer et al.~\cite{dreyer2022semantics} is another excellent learning resource. It covers all of the techniques we will discuss in this subsection.
 
@@ -264,7 +249,7 @@ Coquand and Gallier~\cite{coquand1990proof}, inspired by the Kripke semantics of
 The other addition, step-indexing, was originally introduced by Appel and McAllester~\cite{appel2001indexed} to build an operational semantics-based models for STLC extended with recursive types. They include step counters to introduces stratification in recursive structures. Their logical relations can be used to soundly prove safety and observational equivalence of programs without resorting to a full-scale traditional domain-theoretic treatment, which is advantageous in the context of foundational proof carrying code (PCC) systems.
 The techniques were eventually combined, giving rise to step-indexed Kripke logical relations (SKLR). Ahmed's PhD thesis~\cite{ahmed2004semantics} showed how to use SKLR to model feature-rich realistic programming languages.
 
-Despite being a scalable and powerful method, SKLR has some drawbacks. Proofs are often obscured and hard to mechanized due to the involvement of global state manipulations on the Kripke frame and tedious step-index arithmetics. These complications can be drastically reduced by defining logical relations in a suitable metatheory that can handle step-indexing and frame-preserving state manipulation abstractly.
+Despite being a scalable and powerful method, SKLR has some drawbacks. Proofs are often obscured and hard to mechanize due to the involvement of global state manipulations on the Kripke frame and tedious step-index arithmetics. These complications can be drastically reduced by defining logical relations in a suitable metatheory that can handle step-indexing and frame-preserving state manipulation abstractly.
 Iris is such a metatheory. Krebbers et al.~\cite{krebbers2017interactive,krebbers2018mosel} demonstrated how to define logical relations in Iris and carry out mostly straight-forward proofs in Iris Proof Mode.
 Compared to raw SKLRs, Iris-based logical relations proofs are often much more intuitive to understand on paper and easier to formalize in Rocq.
 
@@ -279,8 +264,8 @@ A typing judgement has the form \(\typed{\Tenv; \Env}{\expr}{\typ}\), where \(\T
 The term \(\expr\) is said to be closed when \(\Env = \bullet\) is empty, i.e., it involves no free term variable.
 We define the value relation \(\semVtype{\Tenv}{\typ}{\semenv} : \iVal \to \iProp_\persistently\) and the expression relation \(\semEtype{\Tenv}{\typ}{\semenv} : \iExpr \to \iProp_\persistently\) by induction on the type \(\typ\).
 Here \(\senv : \Tenv \to (\iVal \to \iProp_\persistently)\) is the interpretation of free type variables.
-The expression relation is defined as \(\semEtype{\Tenv}{\typ}{\semenv}(\expr) \eqdef \wpre{e}{\semVtype{\Tenv}{\typ}{\semenv}}\), stating that \(e\) is will not get stuck and may terminate as a value in \(\semVtype{\Tenv}{\typ}{\semenv}\).
-The value relation, capturing concerns the shape and hereditary semantic property of a value of the type in question, is define as follows:
+The expression relation is defined as \(\semEtype{\Tenv}{\typ}{\semenv}(\expr) \eqdef \wpre{e}{\semVtype{\Tenv}{\typ}{\semenv}}\), stating that \(e\) will not get stuck and may terminate as a value in \(\semVtype{\Tenv}{\typ}{\semenv}\).
+The value relation, capturing concerns the shape and hereditary semantic property of a value of the type in question, is defined as follows:
 
 \begin{align*}
   \semVtype{\Tenv}{\tvar}{\semenv}(\val) \eqdef{}
@@ -319,7 +304,7 @@ We here remind the reader some technical details for ensuring the well-foundedne
   \item The expression relation is closed under head expansion. That is, \(e\redu e'\) and \(\semEtype{\Tenv}{\typ}{\semenv}(e')\) implies \(\semEtype{\Tenv}{\typ}{\semenv}(e)\).
     This is one of the requirement for a relation to be a reducibility candidate.
   \item Quantifying over reducibility candidates.
-    When interpreting \(\forall \tvar.\; \typ\) and \(\exists \tvar.\; \typ\), we did not directly quantify over of all syntactic types, which would introduces circularity.
+    When interpreting \(\forall \tvar.\; \typ\) and \(\exists \tvar.\; \typ\), we did not directly quantify over all syntactic types, which would introduce circularity.
     Instead, we quantify over the type of value relations, i.e., \(\iVal \to \iProp_\persistently\).
     We further note that impredicativity of Iris is crucial for the two clauses to be acceptable.
   \item Recursion (at the object-level) as guarded recursion (at the meta-level).
@@ -399,7 +384,7 @@ The relationship between a denotational model \(\sem{\cdot}\) and the operationa
 \end{description}
 
 In this project, soundness and computational adequacy are our primary focus.
-The Stanford Encyclopedia of Philosophy has a page on game semantics~\cite{sep-games-abstraction} which contains a detailed discussing of the connection between denotational semantics and operational semantics
+The Stanford Encyclopedia of Philosophy has a page on game semantics~\cite{sep-games-abstraction} which contains a detailed discussion of the connection between denotational semantics and operational semantics
 We refer readers who are unfamiliar with (domain-theoretic) denotational semantics to the lecture notes by Pitts et al.~\cite{den-lectures} and the chapter on domain theory by Jung et al.~\cite{jung1996domains} in the \emph{handbook of logic in computer science} for a comprehensive treatment of classical domain theory.
 
 \subsection{Guarded Interaction Trees}
@@ -409,11 +394,11 @@ Guarded interaction trees~\cite{popl24gitree} is essentially a domain of higher-
 It is well-suited for interpreting various languages with higher-order effects.
 Indeed, as demonstrated in by Frumin et al.~\cite{popl24gitree} guarded interaction trees can be used to investigate the semantics of interoperability.\par
 
-Guarded Interaction trees belongs to a long-standing tradition of modeling and reasoning about effectful programs monads to programs within total type theories, an approach pioneered by Moggi~\cite{moggi-monad}.
+Guarded Interaction trees belongs to a long-standing tradition of modeling and reasoning about effectful programs in type theories via monads, an approach pioneered by Moggi~\cite{moggi-monad}.
 Type theories generally rely on normalization and canonicity to ensure consistency, meaning that programs and proofs in a type theory have to be total. Consequently a large class of practical language features including partial functions, non-termination, input/output effects cannot be directly programmed. Many solutions aiming at overcoming this limitation have been proposed. Capretta~\cite{delaymonad} introduced the coinductive delay monad for potentially non-terminating computations. McBride's general monad~\cite{generalmonad} for modeling recursive function calls as request-response pairs. Pir\'og~\cite{res-monad} generalized the delay monad to coinductive resumption monad. Recently, Xia et al.~\cite{itrees} devised the interaction trees (ITrees), a semantic domain for first-order effectful programs.
 A major limitation of these works is the lack of primitive support for higher-order functions and higher-order effects. Leveraging the synthetic step-indexing technique, GItree is able to encode higher-order features natively.\par
 
-Starting form now, we implicitly work within the logic of Iris. When we say a type, we mean an OFE or a COFE. A function type should be understood as the space of non-expansive maps between two OFEs, which is itself an OFE.
+Starting from now, we implicitly work within the logic of Iris. When we say a type, we mean an OFE or a COFE. A function type should be understood as the space of non-expansive maps between two OFEs, which is itself an OFE.
 We now present a highly simplified overview of guarded interaction trees. While this introduction does not entirely match the GItree theory mechanized in Rocq, it provides enough foundational understanding to make the subsequent case studies accessible.
 
 \subsubsection{Effect Signature}
@@ -531,7 +516,7 @@ upon which the following definitions and equations can be derived:
       \quad
       f(\gVis_i(x,k)) \equiv \gVis_i (x, \latert f \circ k)
     \]
-    The identity function is a homomorphism and the composition of homomorphisms is homomorphism.
+    The identity function is a homomorphism and the composition of homomorphisms is a homomorphism.
   \item We can define three functions \(\getret\), \(\getfun\), and \(\getval\) satisfying the following equations.
     \begin{align*}
       \getret(f)(\gRet(n))        &\equiv f\;n
@@ -680,7 +665,7 @@ Informally, it states that \(\wpre{\alpha}{\Phi}\) ensures that \(\alpha\) is sa
 \subsubsection{Combining effects}
 
 The domain of guarded interaction trees \(\IT_E(A)\) is parameterized on a single effect signature.
-To enable constructing and reasoning about programms that uses multiple effects, a mechanism for composing effect is required.\par
+To enable constructing and reasoning about programs that uses multiple effects, a mechanism for composing effect is required.\par
 
 Given two effects \((E_1,\Ins^1, \Outs^1)\) and \((E_2,\Ins^2,\Outs^2)\), one can combine them orthogonally. The combined signature is defined as \((E,\Ins,\Outs)\), where
 
@@ -707,7 +692,7 @@ The state functor of the combined effect is given by \(\State(X) \eqdef \State^1
   \end{cases}
 \]
 
-Based on the this reifier, we can recover the \textsf{WP-REIFY} program logic proof rule.
+Based on this reifier, we can recover the \textsf{WP-REIFY} program logic proof rule.
 
 \begin{mathpar}
   \inferrule[wp-reify-sub-1]
@@ -723,7 +708,7 @@ Based on the this reifier, we can recover the \textsf{WP-REIFY} program logic pr
 \end{mathpar}
 
 We can easily generalize the orthogonal combination construction to mix arbitrary number of effects.
-This is lead to the notion of \emph{sub-effect}.
+This leads to the notion of \emph{sub-effect}.
 An effect signature \((E, \Ins, \Outs)\) is said to be a sub-effect of another signature \((F, \Ins', \Outs')\), denoted by \(E\subeff F\),
 if there is an inclusion \(\epsilon : E \hookrightarrow F\), such that \(\Ins_i(X) \cong \Ins'_{\epsilon(i)}\) and \(\Outs_i(X) \cong \Outs'_{\epsilon(i)}\).\par
 
@@ -766,7 +751,7 @@ For every \(F\) such that \(\epsilon : F_0\subeff F\), we can carry out the foll
   R \langle F, \epsilon \circ \inr \circ \inr \rangle & : \IT_{F}(A) \to \IT_{F}(A) \to \IT_{F}(A) \\
 \end{align*}
 
-Effective, we have defined:
+Effectively, we have defined:
 
 \begin{align*}
   \alpha' &: \forall F .\; (F_0\subeff F) \to \IT_F(A) \\
@@ -831,8 +816,8 @@ For simplicity, the state space and output space of generators in \(\lambda_\prn
   \end{mathpar}
 \end{definition}
 
-We note that generator values are first-class citizen of the \(\lambda_\prng\) language, which can be freely copied, discarded, passed as arguments or returned from functions.
-Indeed, a generator is duplicated when being pass to a function that uses its argument multiple times.
+We note that generator values are first-class citizens of the \(\lambda_\prng\) language, which can be freely copied, discarded, passed as arguments or returned from functions.
+Indeed, a generator is duplicated when passed to a function that uses its argument multiple times.
 On top of this, copies of a generator value share the underlying generator state, making it impossible to predict the stream to be generated by a generator by observing its copies.
 More specifically, suppose that \(g'\) is created by duplicating \(g\) and \(\kw{Rand}\;g\) gives \(n\), the expression \(\kw{Rand}\;g'\) is not guaranteed to return \(n\).
 
@@ -865,11 +850,11 @@ More specifically, suppose that \(g'\) is created by duplicating \(g\) and \(\kw
                   {\typed{\Gamma}{\kw{Seed}\;e_l\;e_s}{\tunit}}
   \end{mathpar}
 \end{definition}
-The type rules is mostly standardly and upholds the weakening and substitution lemma. We note that no typing rule is given for \(\kw{DelPrng}\) -- deleting a potentially shared generator is unsound, so the constructor remains unused in well-typed programs. While it is possible to give a proper typing rule for \(\kw{DelPrng}\) by adopting a linear type discpline, we would like to not overcomplicate \(\lambda_\prng\).
+The typing rules are mostly standard and upholds the weakening and substitution lemma. We note that no typing rule is given for \(\kw{DelPrng}\) -- deleting a potentially shared generator is unsound, so the constructor remains unused in well-typed programs. While it is possible to give a proper typing rule for \(\kw{DelPrng}\) by adopting a linear type discpline, we would like to not overcomplicate \(\lambda_\prng\).
 
 \subsection{Modeling the PRNG effect in guarded interaction trees}
 
-Here, we following the recipe in by Stepanenko et al.~\cite{esop25git-callcc} to model the PRNG effects.
+Here, we follow the recipe in by Stepanenko et al.~\cite{esop25git-callcc} to model the PRNG effects.
 
 \emph{Step 1: Identify the Key Operations.} The PRNG effect involves three key operations \texttt{new}, \texttt{delete}, \texttt{seed}, and \texttt{rand}.
 
@@ -921,8 +906,8 @@ To make our programming and reasoning about the PRNG effect easier, we provide s
 \begin{itemize}
   \item \(\mathrm{PRNG\_NEW}(k : \iLoc \to X) \eqdef \gVis_{\new}((), \Next \circ k)\)
   \item \(\mathrm{PRNG\_DEL\_k}(l : \iLoc, k : \mathbf{1} \to X) \eqdef \gVis_{\del}(l, \Next \circ k)\)
-    and \(\mathrm{PRNG\_DEL}(l,n) \eqdef \mathrm{PRNG\_DEL\_k}(l, n, \gRet())\)
-  \item \(\mathrm{PRNG\_SEED\_k}(l : \iLoc, n : \mathbb{N}, k: \mathbf{1} \to X) \eqdef \gVis_{\new}((l,n), \Next \circ k)\)
+    and \(\mathrm{PRNG\_DEL}(l) \eqdef \mathrm{PRNG\_DEL\_k}(l, \gRet())\)
+  \item \(\mathrm{PRNG\_SEED\_k}(l : \iLoc, n : \mathbb{N}, k: \mathbf{1} \to X) \eqdef \gVis_{\seed}((l,n), \Next \circ k)\)
     and\\ \(\mathrm{PRNG\_SEED}(l,n) \eqdef \mathrm{PRNG\_SEED\_k}(l, n, \gRet())\)
   \item \(\mathrm{PRNG\_GEN\_k}(l : \iLoc, k: \mathbb{N} \to X) \eqdef \gVis_{\rand}(l, \Next \circ k)\) and \(\mathrm{PRNG\_GEN}(l) \eqdef \mathrm{PRNG\_GEN\_k}(l, \gRet)\)
 \end{itemize}
@@ -1252,7 +1237,7 @@ To conclude this part, we showcase a proof that the Las Vegas GItree program alw
 
 Now that a theory of PRNG effects is in place, we can give a denotational semantics of \(\lambda_\prng\) by interpreting programs as GItrees with PRNG effects.
 Let \(E\) be an effect signature such that \(\prng\subeff E\), \(A\) be a type such that \(A \cong \mathbf{1} + \mathbb{N} + \iLoc + B\) for some \(B\).
-We can define a map \(\sem{-}_\senv\) from \(\lambda_\prng\) expresisions to \(\IT_{E}(A)\), where
+We can define a map \(\sem{-}_\senv\) from \(\lambda_\prng\) expressions to \(\IT_{E}(A)\), where
 \(\senv:\iVar \to \IT\) is a substitution environment for free variables.
 The interpretation is depicted in the following figure and should be straight-forward.
 \[
@@ -1293,8 +1278,8 @@ We also interpret \(\lambda_\prng\) evaluation contexts as GItree homomorphisms 
     \sem{\ctxhole}_\senv(\alpha) &\eqdef \alpha\\
     \sem{K\;e}_\senv(\alpha) &\eqdef \sem{K}_\senv(\alpha)\cbvap\sem{e}_\senv
     \quad \sem{v\;K}_\senv(\alpha) \eqdef \sem{v}_\senv\cbvap\sem{K}_\senv(\alpha)\\
-    \sem{K \oplus e}_\env(\alpha) &\eqdef \gnatop{\oplus}(\sem{K}_\senv(\alpha))(\sem{e}_\senv)
-    \quad \sem{v \oplus K}_\env(\alpha) \eqdef \gnatop{\oplus}(\sem{e}_\senv)(\sem{K}_\senv(\alpha))\\
+    \sem{K \oplus e}_\senv(\alpha) &\eqdef \gnatop{\oplus}(\sem{K}_\senv(\alpha))(\sem{e}_\senv)
+    \quad \sem{v \oplus K}_\senv(\alpha) \eqdef \gnatop{\oplus}(\sem{e}_\senv)(\sem{K}_\senv(\alpha))\\
     \sem{\syn{if}\;K\;\syn{then}\;e_1\;\syn{else}\;e_2}(\alpha) & \eqdef \gif(\sem{K}_\senv(\alpha))(\sem{e_1}_\senv)(\sem{e_2}_\senv)\\
     \sem{\kw{DelPrng}\;K}_\senv(\alpha) &\eqdef \getret(\mathrm{PRNG\_DEL})(\sem{K}_\senv(\alpha)) \\
     \sem{\kw{Rand}\;K}_\senv(\alpha) &\eqdef \getret(\mathrm{PRNG\_GEN})(\sem{K}_\senv(\alpha)) \\
@@ -1304,21 +1289,21 @@ We also interpret \(\lambda_\prng\) evaluation contexts as GItree homomorphisms 
 \]
 Recall that GItree homomorphisms are GItree evaluation contexts in the operational semantics of GItrees.
 In other word, under the denotational semantics,
-not only \(\lambda_\prng\) do programs becomes GItree programs,
-\(\lambda_\prng\) evaluation contexts also corresponds to evaluation contexts.\par
+not only do \(\lambda_\prng\) programs becomes GItree programs,
+\(\lambda_\prng\) evaluation contexts also corresponds to GItree evaluation contexts.\par
 
 We note that our interpretation is compositional. That is, given a context \(C\), which is not necessarily an evaluation context, the following equivalence holds.
 \[
   \forall e_1,e_2.\;
   \sem{e_1}_\senv \equiv \sem{e_2}_\senv
   \implies
-  \sem{C[e_1]}_\senv \equiv \sem{C[e_2]}
+  \sem{C[e_1]}_\senv \equiv \sem{C[e_2]}_\senv
 \]
 
 Having defined a translation from \(\lambda_\prng\) to GItrees,
 we would like to show that \(\sem{\cdot}\) faithfully and adequately captures the operational semantics of \(\lambda_\prng\).
 More specifically, for a \(\lambda_\prng\) program \(e\), the execution of \(e\) should relate to the reduction of \(\sem{e}\),
-which will allow us to leverage the interpretation to prove semantical properties, e.g. type safety and contextual refinement, without directly working on the operational semantics of \(\lambda_\prng\).\par
+which will allow us to leverage the interpretation to prove semantic properties, e.g. type safety and contextual refinement, without directly working on the operational semantics of \(\lambda_\prng\).\par
 
 Our first result is the soundness of this denotational interpretation, which can be proved directly by induction.
 \begin{theorem}[Soundness of the GItree interpretation for \(\lambda_\prng\)]
@@ -1328,7 +1313,6 @@ Our first result is the soundness of this denotational interpretation, which can
     \implies
     (\sem{e_1},\sigma_1) \Redu^\ast (\sem{e_2},\sigma_2)
   \]
-  for every natural number \(n\in\mathbb{N}\).
 \end{theorem}
 
 It states that if a program \(e_1\) can steps to \(e_2\) while taking the state from \(\sigma_1\) to \(\sigma_2\),
@@ -1358,7 +1342,7 @@ As a direct corollary, we can prove contextual equivalence by demonstrating deno
     e_1 \cong_{\mathrm{ctx}} e_2
   \]
   where \(e_1 \cong_{\mathrm{ctx}} e_2\) denotes standard contextual equivalence
-  for every context \(C\), which is not necessarily an evaluation context, such such that \(\typed{\bullet}{C[e_1]}{\tnat}\) and \(\typed{\bullet}{C[e_2]}{\tnat}\),
+  for every context \(C\), which is not necessarily an evaluation context, such that \(\typed{\bullet}{C[e_1]}{\tnat}\) and \(\typed{\bullet}{C[e_2]}{\tnat}\),
   \[
     \forall \sigma, \sigma',n .\;
     (C[e_1],\sigma) \redu^* (n,\sigma')
@@ -1407,7 +1391,7 @@ More specifically, we will define a family of binary logical relation over \(\la
     \mathcal{V}_{\type_1 \to \type_2}(\alpha_v,v) &\eqdef \exists f.\;
     \alpha_v \equiv \gFun(f) \land
     \Box\forall \beta_v,u.\; \mathcal{V}_{\type_1}(\beta_v,u) \wand
-    \mathcal{E}_{\type_2}(\gFun(f)\cbvap \beta_v,\; \eapp{v}{v'})\\
+    \mathcal{E}_{\type_2}(\gFun(f)\cbvap \beta_v,\; \eapp{v}{u})\\
     \mathcal{E} & : \iType \to \mathrm{Rel}(\IT,\iExpr) \\[0.6ex]
     \mathcal{E}_{\type}(\alpha,e) &\eqdef \forall \sigma.\;
     \hasstate(\sigma) \star \hasprngs(\sigma) \wand
@@ -1659,7 +1643,7 @@ Indeed, in the presence of general recursion, we have no hope of proving the ter
 
 To complete the proof, we would need the soundness of the GItree program logic, specialized to the denotation of \(\lambda_\prng\) programs, with respect to the operational semantics of \(\lambda_\prng\).
 This is the kind of adequacy theorems discussed in the \emph{program logics \`a la carte} paper~\cite{proglog-carte}.
-The research paper proposed a modular approach of building program logic for effectful languagees.
+The research paper proposed a modular approach of building program logic for effectful languages.
 In their settings, they define \(\wpre{e}{\Phi}\) as \(\wpre{\sem{e}}{\Phi}\) where \(\sem{\cdot}\) interprets programs as interaction trees~\cite{itrees}. By doing so, the equational theory of ITrees and various effect theories can be reused to build program logic for different languages.
 Whenever a program logic is defined, an adequacy theorem linking \(\wpre{\sem{e}}{\Phi}\) with the operational semantics of \(e\) has to be established.
 To the best of our knowledge, no similar experimentation has been done for guarded interaction trees.
@@ -1677,7 +1661,7 @@ In the future, we would like to extend the framework to enable modeling rich int
 Physical devices are essentially random number generators whose behaviors can be approximated and partially predicted by automata models.\par
 The first step towards this goal is to give alternative reification to the PRNG effect signature.
 One can observe that the signature itself is sufficient to model deterministic (pseudo-random), stochastic, and non-determinism processes.
-Therefore, it should be possible to reify the effect as non-deterministic choice or sampling from a discrete probabilistic distribution. Depending on how the effect is how the effect is implemented, different program logics rule can be derived, enabling reasoning about non-deterministic and/or stochastic GItrees. Unfortunately, these two alternative reifications cannot be defined in the current framework since a reifier is a Rocq function, which is always pure and total.\par
+Therefore, it should be possible to reify the effect as non-deterministic choice or sampling from a discrete probabilistic distribution. Depending on how the effect is how the effect is implemented, different program logic rules can be derived, enabling reasoning about non-deterministic and/or stochastic GItrees. Unfortunately, these two alternative reifications cannot be defined in the current framework since a reifier is a Rocq function, which is always pure and total.\par
 With that said, the implicit state rules, i.e. \textsf{WP-PRNG-NEW}, \textsf{WP-PRNG-SEED}, and \textsf{WP-PRNG-GEN}, are sound for pseudo-random, non-deterministic and probabilistic number generators. These rules require that the program can be executed safely regardless of the number being generated. Programs that are proven to be safe with this set of rules are safe no matter how we choose to interpret the effect. Specifically, the partial correctness proof of Las Vegas program will remain to be sound if we replace the PRNG reifier with a probabilistic sampling reifier.\par
 
 There are multiple ways to generalize the GItree theory to lift the aforementioned limitation:
@@ -1685,7 +1669,7 @@ There are multiple ways to generalize the GItree theory to lift the aforemention
 \begin{enumerate}
   \item Define a reifier as a binary relation over \((\IT,State)\) with richer information (probability, weight, etc).
     The resulting theory is more operational in the sense reasoning about GItrees will be carried out in an operational style.
-  \item Define a reifiers as an monadic function and endow GItrees with trace semantics.
+  \item Define a reifiers as a monadic function and endow GItrees with trace semantics.
     This approach likely gives a more denotational theory.
 \end{enumerate}
 
@@ -1693,7 +1677,7 @@ It is currently unclear whether these approaches are feasible.
 
 \subsection{Applicative bisimulation for GItrees}
 
-We would like to develop a bismulation for identifying GItrees that have essentially the same behavior but differs in the number of \(\Tick\)s takes to evaluate them.
+We would like to develop a bisimulation for identifying GItrees that have essentially the same behavior but differs in the number of \(\Tick\)s takes to evaluate them.
 More formally, we want to define a binary relation \(\sim : \IT_{E}(A) \times \IT_{E}(A)\) validating the following rules:
 
 \begin{mathpar}
@@ -1702,7 +1686,7 @@ More formally, we want to define a binary relation \(\sim : \IT_{E}(A) \times \I
   \and \inferrule{\alpha \sim \beta \\ \beta\sim \gamma}{\alpha \sim \gamma}\\
   \inferrule{\alpha \sim \Tick(\beta)}{\alpha \sim \beta}
   \and \inferrule{\forall \alpha.\; f~\alpha \sim g~\alpha}{\gFun(f) \sim \gFun(g)}
-  \and \inferrule{x \sim y \\ \forall \beta.\; f~\beta \sim g~\beta}{\gVis_i(x,k) \sim \gVis_i(y,g)}
+  \and \inferrule{x \sim y \\ \forall \beta.\; k~\beta \sim k'~\beta}{\gVis_i(x,k) \sim \gVis_i(y,k')}
 \end{mathpar}
 
 Ideally, we would like to re-develop the binary logical relation for representation independence in Timany et al.~\cite{jacm-logrel} for GItrees.
