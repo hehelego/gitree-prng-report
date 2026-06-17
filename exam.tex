@@ -1,0 +1,645 @@
+\documentclass[8pt]{beamer}
+
+\usetheme{Copenhagen}
+\usecolortheme{seahorse}
+\setbeamertemplate{headline}{}
+
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{mathpartir}
+\usepackage{extarrows}
+\usepackage{stmaryrd}
+\usepackage{xcolor}
+\usepackage{naive-ebnf}
+\usepackage{bm}
+\usepackage{url}
+\usepackage{hyperref}
+
+\definecolor{sblue}{RGB}{41, 128, 185}
+
+\usepackage{pl}
+\usepackage{iris}
+
+\title{Modeling Pseudo-randomness in Guarded Intearction Trees}
+\author{Charles Peng}
+\date{\today}
+
+\AtBeginSection[]
+{
+  \begin{frame}<beamer>
+    \frametitle{Plan}
+    \tableofcontents[currentsection]
+  \end{frame}
+}
+
+\newcommand{\prng}{\mathrm{prng}}
+\newcommand{\subeff}{\rightarrowtail}
+
+\newcommand{\Error}{\mathrm{Error}}
+\newcommand{\Ins}{\mathsf{Ins}}
+\newcommand{\Outs}{\mathsf{Outs}}
+
+\newcommand{\new}{\mathrm{new}}
+\newcommand{\del}{\mathrm{del}}
+\newcommand{\seed}{\mathrm{seed}}
+\newcommand{\rand}{\mathrm{rand}}
+
+\newcommand{\efinput}{\mathrm{input}}
+\newcommand{\efoutput}{\mathrm{output}}
+
+\newcommand{\efalloc}{\mathrm{alloc}}
+\newcommand{\efdealloc}{\mathrm{dealloc}}
+\newcommand{\efread}{\mathrm{read}}
+\newcommand{\efwrite}{\mathrm{write}}
+
+\newcommand{\redu}{\mapsto}
+\newcommand{\redus}{\redu^\ast}
+\newcommand{\Redu}{\rightsquigarrow}
+\newcommand{\Redus}{\Redu^\ast}
+\newcommand{\easgn}{\;\syn{\mathrel{:=}}\;}
+
+\newcommand{\Set}{\mathbf{Set}}
+\newcommand{\OFE}{\mathbf{OFE}}
+\newcommand{\COFE}{\mathbf{COFE}}
+
+\newcommand{\inl}{\mathrm{inl}}
+\newcommand{\inr}{\mathrm{inr}}
+
+\newcommand{\hasstate}{\textsf{has\_state}}
+
+\newcommand{\IT}{\mathrm{IT}}
+\newcommand{\gRet}{\mathrm{Ret}}
+\newcommand{\gErr}{\mathrm{Err}}
+\newcommand{\gTau}{\mathrm{Tau}}
+\newcommand{\gVis}{\mathrm{Vis}}
+\newcommand{\gFun}{\mathrm{Fun}}
+\newcommand{\Tick}{\mathrm{Tick}}
+\DeclareMathOperator*{\Next}{\mathrm{next}}
+\newcommand{\getret}{\mathrm{get\_ret}}
+\newcommand{\getfun}{\mathrm{get\_fun}}
+\newcommand{\getval}{\mathrm{get\_val}}
+\newcommand{\cbnap}{\bullet_{\text{cbn}}}
+\newcommand{\cbvap}{\bullet_{\text{cbv}}}
+\newcommand{\gnatop}[1]{\mathrm{NatOp}_{#1}}
+\newcommand{\gif}{\mathrm{If}}
+\newcommand{\gwhile}{\mathrm{While}}
+
+\newcommand{\out}{\mathrm{read}}
+\newcommand{\upd}{\mathrm{update}}
+\newcommand{\mix}{\mathrm{mix}}
+\newcommand{\knownprng}{\textsf{known\_prng}}
+\newcommand{\hasprngs}{\textsf{has\_prngs}}
+\newcommand{\prngCtx}{\knowInv{\iota p}{\exists \sigma.\; \hasstate(\sigma) * \hasprngs(\sigma)}}
+\newcommand{\heapCtx}{\knowInv{\iota h}{\exists \sigma_h.\; \hasstate(\sigma_h)}}
+
+\newcommand{\Excl}{\operatorname{Excl}}
+\newcommand{\AuthFull}{\operatorname{\bullet}\;}
+\newcommand{\AuthFrag}{\operatorname{\circ}\;}
+\newcommand{\EmptyK}{\mathrm{EmptyK}}
+\newcommand{\recval}[3]{\syn{rec}\;#1(#2)=#3}
+
+\newcommand{\demph}[1]{\textcolor{gray}{#1}}
+
+\begin{document}
+  \maketitle{}
+
+  \begin{frame}{Overview}
+
+    \begin{block}{Efforts and Contributions}
+      \begin{enumerate}
+        \item (Background) \demph{Iris in Rocq, SKLR in Iris, Model of SGDT\&Iris, GItrees, etc.}
+        \item PRNG effect theory \demph{signature, reifier, and program logic.}
+        \item GItree-based semantics \demph{computational adequacy for \(\lambda_\prng\)}
+        \item Formalization in Rocq as an extension to the GItree development
+        \item Discussion of \demph{limitations and possible generalizations}
+      \end{enumerate}
+    \end{block}
+
+    \pause
+
+    \begin{block}{Style guide}
+      \begin{itemize}
+        \item mostly high-level and informal
+        \item focus on what I have actually done
+        \item non-standard and yet non-original
+      \end{itemize}
+    \end{block}
+  \end{frame}
+
+  \section{Iris --- a logic of recursion}
+
+  \begin{frame}{Fixed point in Iris}
+    From \emph{topos of tree} (SGDT) to the category of \textbf{OFE/COFE}.
+    \begin{block}{induction on recursive structures --- iProp level iso-recursion}
+      Guarded recursion: Banach's fixed point theorem. (Contractive function)
+      \begin{mathpar}
+        \inferrule[t-fix]{\typed{\Gamma,x:\tau}{t}{\tau} \\ \text{later-guarded}}{\typed{\Gamma}{\mu x . t}{\tau}}
+        \and \inferrule[eq-fix]{ }{\typed{\Gamma}{\mu x .\; t = \subst{t}{x}{(\mu x .\; t)}}{\tau}}
+        \and \inferrule[l\"ob]{ \later P \vdash P }{\vdash P}
+      \end{mathpar}
+      Examples: recursive representation predicates and weakest preconditions.
+    \end{block}
+    \begin{block}{constructing recursive structures --- RDE solver}
+      America and Rutten's theorem. (Locally contractive bi-functor on \textbf{COFE}. Non-empty.)
+      \[
+        G : \COFE^{op}\times \COFE \to \COFE
+        \qquad
+        G(T, T) \cong T
+      \]
+      Examples: Iris model and guarded interaction trees
+    \end{block}
+  \end{frame}
+
+  \begin{frame}{SKLR in Iris, abstractly}
+    \begin{itemize}
+      \item Step-indexed interpretations of iProp. iProp monotone w.r.t. step-indices.
+      \item Kripke frame: Worlds \( \ownM{\cdot}\). Accessibility \(\subseteq = \ownM{a} \vdash \pvs \ownM{b}\) when \(a\Redu b\).\\
+        iProp monotone w.r.t. resources.
+      \item MISC: iProp impredicativity. Guarded recursion. WP closure under expansion.
+      \item Persistent value relation: contraction* and weakening in object language.
+    \end{itemize}
+    \color{gray}
+    \begin{align*}
+      \semEtype{\Tenv}{\typ}{\semenv}(\expr) \eqdef{} 
+      & \wpre{e}{\semVtype{\Tenv}{\typ}{\semenv}}\\
+      \semVtype{\Tenv}{\tvar}{\semenv}(\val) \eqdef{}
+      & \semenv(\tvar)(\val)\\
+      \semVtype{\Tenv}{\Tnat}{\semenv}(\val) \eqdef{}
+      & \exists n \in \nat.\; \val = n\\
+      \semVtype{\Tenv}{\typ_1 \times \typ_2}{\semenv}(\val) \eqdef{}
+      & \exists \val_1, \val_2.\; \val = (\val_1, \val_2) \sep
+      \semVtype{\Tenv}{\typ_1}{\semenv}(\val_1) \sep \semVtype{\Tenv}{\typ_2}{\semenv}(\val_2)\\
+      \semVtype{\Tenv}{\typ \to \typ'}{\semenv}(\val) \eqdef{}
+      & \persistently \left(\forall \valB.\; \semVtype{\Tenv}{\typ}{\semenv}(\valB) \wand 
+      \semEtype{\Tenv}{\typ'}{\semenv}(\val~\valB) \right) \\
+      \semVtype{\Tenv}{\forall \tvar.\; \typ}{\semenv}(\val) \eqdef{}
+      & \persistently\left(\forall (\predB : \iVal \to \iProp_\persistently).\; \semEtype{\Tenv, \tvar}{\typ}{\semenv, \tvar \mapsto \predB}(\val~\langle\rangle)\right)\\
+      \semVtype{\Tenv}{\Tmu \tvar.\; \typ}{\semenv}(\val) \eqdef{}
+      & \mu (\predB : \iVal \to \iProp_\persistently).\; \exists \valB.\; (\val = \textlang{fold}\ \valB) \sep
+      \later \semVtype{\Tenv}{\typ}{\semenv, \tvar \mapsto \predB}(\valB) \\
+      \semVtype{\Tenv}{\Tref(\typ)}{\semenv}(\val) \eqdef{}
+      & \exists \loc.\; \val = \loc \sep
+      \knowInv{\namesp.\loc}{\exists \valB.\; \loc \mapsto \valB \sep
+      \semVtype{\Tenv}{\typ}{\semenv}(\valB)}
+    \end{align*}
+  \end{frame}
+
+  \begin{frame}{Interlude: modularity of proofs parameterized by CMRAs}
+    \begin{block}{data types \`a la carte}
+      \begin{mathpar}
+        \inferrule{x \in A}{\exists B.\; A \cong B + x}
+        \and \inferrule{ }{x \in x\col A}
+        \and \inferrule{x \in A}{x \in A+B}
+        \and \inferrule{x \in B}{x \in A+B}
+      \end{mathpar}
+      Universally quantify over an open union \(U\). Contextual/Implicit variable \(x \in A\)\\
+      In the end, instantiate \(U\) with a big enough concrete sum.
+    \end{block}
+
+    \begin{exampleblock}{}
+      \begin{itemize}
+        \item CMRA: \texttt{gFunctors} and \texttt{subG}
+        \item Reifier: \texttt{gReifiers} and \texttt{subReifier}
+        \item Base value: \texttt{sumO} and \texttt{subOfe}
+      \end{itemize}
+    \end{exampleblock}
+  \end{frame}
+
+  \section{GItree --- a domain for untyped effectful programs}
+
+  \begin{frame}{effects signatures}
+    \begin{exampleblock}{we need your signatures}
+      To specify an effect call: \(\gVis_i(x, k)\)
+      \begin{itemize}
+        \item operator \(i\)
+        \item input data \(x\)
+        \item callback/continuation \(k\)
+      \end{itemize}
+      Signature: defining well-formed calls \((E : \Set,\Ins, \Outs : E \to \COFE \to \COFE)\)
+    \end{exampleblock}
+    \pause
+    First-order effects: single tape I/O \(E = \{\efinput, \efoutput\}\)
+    \[
+      \Ins_i(X) = \begin{cases}
+        \mathbf{1} & i = \efinput\\
+        \mathbb{N} & i = \efoutput\\
+      \end{cases}
+      \quad
+      \Outs_i(X) = \begin{cases}
+        \mathbb{N} & i = input\\
+        \mathbf{1} & i = output\\
+      \end{cases}
+    \]
+    Higher-order effects: untyped reference cells \(E = \{\efalloc, \efdealloc, \efread, \efwrite\}\)
+    \[
+      \Ins_i(X) = \begin{cases}
+        X & i = \efalloc\\
+        \iLoc & i = \efdealloc\\
+        \iLoc & i = \efread\\
+        \iLoc \times X & i = \efwrite\\
+      \end{cases}
+      \quad
+      \Outs_i(X) = \begin{cases}
+        \iLoc & i = \efalloc\\
+        \mathbf{1} & i = \efdealloc\\
+        X & i = \efread\\
+        \mathbf{1} & i = \efwrite\\
+      \end{cases}
+    \]
+  \end{frame}
+
+  \begin{frame}[allowframebreaks]{a domain of higher-order effectful programs}
+    Fixing the set of base values \(A\) and a effect signature:
+    \begin{align*}
+      D & \cong \Error + A + \latert D + \latert [D \to D] + \sum_{i\in E} \left( \Ins_i(\latert D) \times [\Outs_i(\latert D) \to \latert D] \right) \cong F(D,D) \\
+      F(X,Y) & = \Error + A + \latert Y + \latert [X \to Y] + \sum_{i\in E} \left( \Ins_i(\latert Y) \times [\Outs_i(\latert X) \to \latert Y] \right)
+    \end{align*}
+
+    Fold/Unfold + Guarded Rec: intro\&elim\&comp untyped effectful calculus
+    \begin{block}{Constructors}
+      \begin{itemize}
+        \item Error \(\gErr(e : \Error)\)
+        \item Base value \(\gRet(a : A)\)
+        \item Function value \(\gFun(f : \latert (\IT \to \IT))\)
+        \item Delay \(\gTau(t : \latert \IT)\). Normal form \(\Tick(\alpha : \IT) \eqdef \gTau(\Next(\alpha))\)
+        \item Visible event \(\gVis_{i \in E}(x: \Ins_i(\latert \IT),\,k : \Outs_i(\latert \IT) \to \latert \IT)\)
+      \end{itemize}
+    \end{block}
+
+    \framebreak
+
+    \begin{block}{Homomorphisms}
+      A homomorphism \(f : \IT \to \IT\) cares only about GItree values.
+      \[
+        f(\gErr(e)) \equiv \gErr(e)
+        \quad
+        f(\Tick(\alpha)) \equiv \Tick(f(\alpha))
+        \quad
+        f(\gVis_i(x,k)) \equiv \gVis_i (x, \latert f \circ k)
+      \]
+      \begin{itemize}
+        \item extract base value \(\getret(f,-)\): \(\getret(f,\gRet(a)) \equiv f\,a\)
+        \item extract function \(\getfun(g,-)\): \(\getfun(g,\gFun(h)) \equiv g\,h\)
+        \item CBV fun app \(- \cbvap \beta\): \(\gFun(\Next f) \cbvap \beta \equiv f(\beta)\)
+        \item Control flow: let-in, sequencing, if-conditional, while-loops, etc.
+      \end{itemize}
+    \end{block}
+  \end{frame}
+
+  \begin{frame}{GItree operational semantics}
+    Equational theory --- pure computation. Reifiers --- effectful reduction.\\
+    \begin{block}{Effect reification}
+      Effect state type and state transition function
+      \[
+        \State : \COFE \to \COFE
+        \quad
+        r : \prod_{i\in E} \left( \Ins_i(X) \times \State(X) \to \option{(\Outs_i(X) \times \State(X))} \right)
+      \]
+      (One possible) I/O effect implementation \(\State(X) = \mathbb{N}^\ast \times \mathbb{N}^\ast\)
+      \[
+        \quad
+        r_{0}((),(l_0,l_1)) = \begin{cases}
+          \None & l_0 = [] \\
+          \Some(x, (l_0',l_1)) & l_0 = x \col l_0'
+        \end{cases}
+        \quad
+        r_{1}(x,(l_0,l_1)) = \Some((), (l_0, x \col l_1))
+      \]
+    \end{block}
+    \begin{block}{Running a GItree program}
+      Configuration: \(\IT \times \State(\IT)\)
+      \begin{enumerate}
+        \item unfolding guarded fixed points and applying functions \((\Tick(\alpha),\sigma) \Redu (\alpha,\sigma)\).
+        \item executing effects \((\gVis_i(x, k),\sigma) \Redu (\beta,\sigma)\) when \(r_i(x) = \Some(y,\sigma')\) and \(k\ y = \Next \beta\).
+      \end{enumerate}
+      GItree homomorphisms are evaluation contexts.
+    \end{block}
+  \end{frame}
+
+  \begin{frame}{GItree program logic}
+    The guarded fixed point definition of weakest precondition. \(\wpre{\alpha}{\Phi}\)
+    \begin{itemize}
+      \item Either \(\alpha_v\) and \(\Phi(\alpha_v)\).
+      \item Or \((\alpha,\sigma) \Redu (\alpha',\sigma')\) and \(\wpre{\alpha'}{\Phi}\), for every \(\sigma,\sigma'\).
+        % Use ghost states and frame-preserving updates instead of actual reduction.
+    \end{itemize}
+    The familiar proof rules
+    \begin{mathpar}
+      \inferrule[wp-val]{\Phi(\alpha_v)}{\wpre{\alpha_v}{\Phi}}
+      \and
+      \inferrule[wp-tick]{\later\wpre{\alpha}{\Phi}}{\wpre{\Tick(\alpha)}{\Phi}}
+      \and
+      \inferrule[wp-bind]{\text{IT-Hom}(f) \\ \wpre{\alpha}{\alpha_v . \wpre{f(\alpha_v)}{\Phi}}}{\wpre{f(\alpha)}{\Phi}}
+      \and
+      \inferrule[wp-upd]{\pvs \wpre{\alpha}{\alpha_v . \pvs \Phi(\alpha_v)}}{\wpre{\alpha}{\Phi}}
+      \and
+      \inferrule[wp-mono]{\wpre{\alpha}{\Psi} \\ \forall \alpha_v . \Psi(\alpha_v)\wand\Phi(\alpha_v)}{\wpre{\alpha}{\Phi}}
+      \and
+      \inferrule[wp-reify]
+      {\hasstate(\sigma)\\
+        r_i(x,\sigma) = \Some(\beta,\sigma')\\
+      \later \left( \hasstate(\sigma') \wand \wpre{\beta}{\Phi} \right)}
+      {\wpre{\gVis_i(x, k)}{\Phi}}
+    \end{mathpar}
+    Use an accompanying ghost theory to recover local rules (later).
+    \begin{mathpar}
+      \inferrule[wp-read]{\heapCtx \\ \ell\pointsto \alpha \\ \later (\ell\pointsto \alpha \wand \wpre{\alpha}{\Phi})}{\wpre{(!\ell)}{\Phi}}
+      \and \inferrule[wp-store]{\heapCtx \\ \ell\pointsto \alpha \\ \later (\ell\pointsto \beta \wand \Phi(\gRet()))}{\wpre{(\ell\gets \beta)}{\Phi}}
+    \end{mathpar}
+  \end{frame}
+
+  \section{PRNG Effect Theory}
+
+  \begin{frame}[allowframebreaks]{pseudo-randomness as an effect}
+    \begin{block}{pseudo-randomness}
+      Regarding a deterministic state machine as random/non-deterministic.
+      \begin{itemize}
+        \item Generator state \(S\)
+        \item Output type \(T\)
+        \item Next state \(S \to S\)
+        \item Read out \(S \to T\)
+        \item Seed \(S \to S \to S\)
+      \end{itemize}
+      For simplicity, take \(S = T = \mathbb{N}\)
+    \end{block}
+    \begin{block}{PRNG effect signature}
+      \begin{itemize}
+        \item Create a generator: \(\Ins_{\new}(X) = \mathbf{1}\) and \(\Outs_{\new}(X) = \iLoc\).
+        \item Deletion a generator: \(\Ins_{\del}(X) = \iLoc\) and \(\Outs_{\del} = \mathbf{1}\).
+        \item Add entropy: \(\Ins_{\seed}(X) = \iLoc \times \mathbb{N}\) and \(\Outs_{\seed}(X) = \mathbf{1}\).
+        \item Next sample: \(\Ins_{\rand}(X) = \iLoc\) and \(\Outs_{\rand}(X) = \mathbb{N}\).
+      \end{itemize}
+    \end{block}
+    \framebreak
+    \begin{block}{PRNG effect reifier}
+      \(\State(X) \eqdef \iLoc \fpfn \mathbb{N}\).
+      \begin{align*}
+        r_{\new}((), \sigma) & \eqdef \Some(\ell, \sigma[\ell\mapsto 0]) \text{ \(\ell \notin \dom(\sigma)\) is a fresh location}\\
+        r_{\del}(\ell,\sigma) & \eqdef \begin{cases}
+          \Some((), \mathrm{delete}(\sigma,\ell)) & \ell \in \dom(\sigma)\\
+          \None & \ell \notin \dom(\sigma)\\
+        \end{cases} \\
+          r_{\seed}((\ell,s), \sigma) & \eqdef \begin{cases}
+            \Some((), \sigma[\ell\mapsto \mix(n,s)]) & \ell \in \dom(\sigma) \land \sigma(\ell) = n\\
+            \None & \ell \notin \dom(\sigma)\\
+          \end{cases}\\
+            r_{\rand}(\ell,\sigma) & \eqdef \begin{cases}
+              \Some(\out(n), \sigma[\ell\mapsto \upd(n)]) & \ell \in \dom(\sigma) \land \sigma(\ell) = n\\
+              \None & \ell \notin \dom(\sigma)\\
+            \end{cases}
+            \end{align*}
+            Wrappers around \(\gVis\):
+            \begin{itemize}
+              \item \(\mathrm{PRNG\_NEW}(k : \iLoc \to \IT)\)
+              \item \(\mathrm{PRNG\_DEL}(\ell : \iLoc)\)
+              \item \(\mathrm{PRNG\_SEED}(\ell : \iLoc,n : \mathbb{N})\)
+              \item \(\mathrm{PRNG\_GEN\_k}(\ell : \iLoc, k: \mathbb{N} \to \IT)\)
+            \end{itemize}
+          \end{block}
+        \end{frame}
+
+        \begin{frame}{we need a ghost theory}
+          \(\hasstate(\sigma : \iLoc \fpfn \mathbb{N})\) is a monolithic.
+          Devise a ghost theory to recover local rules.
+
+          \begin{mathpar}
+            \inferrule[wp-reify]
+            {\hasstate(\sigma)\\
+              r_i(x,\sigma) = \Some(\beta,\sigma')\\
+            \later \left( \hasstate(\sigma') \wand \wpre{\beta}{\Phi} \right)}
+            {\wpre{\gVis_i(x, k)}{\Phi}}
+          \end{mathpar}
+
+          \pause
+
+          \begin{alertblock}{\(\mathrm{PRNG\_DEL}\) is evil}
+            \begin{enumerate}
+              \item Deleting a shared generator is not safe.
+              \item Deletion is only safe under exclusive ownership.
+              \item Controlled duplication --- fractional ownership
+              \item \(\lambda_{\prng}\) substructural type system
+            \end{enumerate}
+            Dropped for simplicity
+          \end{alertblock}
+        \end{frame}
+
+        \begin{frame}{Towards PRNG program logics}
+          \begin{mathpar}
+            \inferrule[gh-partial-dup]{ }{\knownprng(\ell)\vdash\knownprng(\ell) \star \knownprng(\ell)}
+            \and \inferrule[wp-prng-new]
+            {\prngCtx\\
+            \later\later(\forall \ell.\; \knownprng(\ell) \wand \wpre{k\;\ell}{\Phi})}
+            {\wpre{\mathrm{PRNG\_NEW}\;k}{\Phi}}
+            \and
+            \inferrule[wp-prng-gen]
+            {\prngCtx\\
+              \later \knownprng(\ell)\\
+            \later\later \forall n.\; \Phi(\gRet(n))}
+            {\wpre{\mathrm{PRNG\_GEN}\;\ell}{\Phi}}
+            \and
+            \inferrule[wp-prng-seed]
+            {\prngCtx\\
+              \later \knownprng(\ell)\\
+            \later\later\Phi(\gRet(()))}
+            {\wpre{\mathrm{PRNG\_SEED}\;\ell\;m}{\Phi}}
+          \end{mathpar}
+        \end{frame}
+
+        \begin{frame}{PRNG ghost theory}
+          \begin{mathpar}
+            \inferrule[gh-store-alloc]{\sigma : \iLoc \fpfn \mathbb{N}}{\vdash \pvs \hasprngs(\sigma)}
+            \and \inferrule[gh-loc-alloc]{\ell \notin \dom(\sigma) \\ n \in \mathbb{N}}{\hasprngs(\sigma) \vdash \pvs (\hasprngs(\sigma[\ell\easgn n])\star \knownprng(\ell))}
+            \and \inferrule[gh-get]{ }{\hasprngs(\sigma) \star \knownprng(\ell)\vdash \hasprngs(\sigma) \star \exists n \in \mathbb{N}\;.\;\sigma(\ell) = n}
+            \and \inferrule[gh-set]{n \in \mathbb{N}}{\hasprngs(\sigma) \star \knownprng(\ell)\vdash \pvs \hasprngs(\sigma[\ell\easgn n])}
+          \end{mathpar}
+          \pause
+          Crafting a RA? Maybe two RAs:
+          One authoritative RA is insufficient.
+          \begin{mathpar}
+            \inferrule
+            {\forall \sigma'.\;
+              \mathcal{V}(\sigma \cdot \sigma')
+              \implies
+            \mathcal{V}(\sigma[\ell\easgn n] \cdot \sigma')}
+            {\AuthFull \sigma \Redu \AuthFull \sigma[\ell\easgn n]}
+          \end{mathpar}
+          What if \(\ell\) is already assigned in \(\sigma'\)?
+          \vfill
+          \pause
+          \(\gamma_V\) for \(\textsf{exclR}(\textsf{gmapUR}(\iLoc,\mathbb{N}))\) and
+          \(\gamma_K\) for \(\textsf{authR}(\textsf{gsetR}(\iLoc))\)
+          \[
+            \textsf{has\_prngs}(\sigma) \eqdef \ownGhost{\gamma_V}{\Excl(\sigma)} * \ownGhost{\gamma_K}{\AuthFull\dom(\sigma)}
+            \qquad
+            \knownprng(\ell) \eqdef \ownGhost{\gamma_K}{\AuthFrag(\{\ell\})}
+          \]
+        \end{frame}
+
+        \begin{frame}{PRNG program \& proof}
+          A naive rejection sampling program:
+          \[
+            \begin{array}{rcl}
+              \syn{las\_vegas}(sd, init, test)
+  & \eqdef &
+  \begin{array}[t]{l}
+    \mathrm{PRNG\_NEW}\;(\lambda r. \\
+    \qquad \mathrm{ALLOC}\;(\gRet(init))\;(\lambda s. \\
+    \qquad\quad \mathrm{PRNG\_SEED}\;r\;sd; \\
+    \qquad\quad \gwhile\;(\mathrm{neg\_bool}\;(test \cbvap \mathrm{READ}\;s)) \\
+    \qquad\qquad (\mathrm{LET}\;x = \mathrm{PRNG\_GEN}\;r\ \mathrm{in}\ \mathrm{WRITE}\;s\;x) \\
+    \qquad\quad \mathrm{READ}\;s))
+  \end{array}
+            \end{array}
+          \]
+          A simple partial correctness spec:
+          \begin{align*}
+              & \persistently\left(
+                \forall n.\; \wpre{\{test \cbvap \gRet(n)\}}
+                {\beta.\; (\beta \equiv \gRet(1) \land f(n) = \mathbf{T}) \lor (\beta \equiv \gRet(0) \land f(n) = \mathbf{F})}
+              \right) \\
+            \star & \heapCtx \star \prngCtx \\
+                  & \proves
+                  \wpre{\syn{las\_vegas}(sd, init, test)}
+                  {\beta.\; \exists n.\; \beta \equiv \gRet(n) \land f(n) = \mathbf{T}}
+          \end{align*}
+          Proof: as if we are doing a proof for \texttt{HeapLang}.
+        \end{frame}
+
+  \section{Denotational Semantics for lambda PRNG}
+
+  \begin{frame}[allowframebreaks]{\(\lambda_\prng\) to GItree}
+    \((e : \iExpr\ \Gamma)\ (\senv : \Gamma \to \IT) \to (\sem{e}_\senv : \IT)\)
+    \begin{align*}
+      \sem{\vunit}_\senv &\eqdef \gRet(())
+      \quad \sem{n}_\senv \eqdef \gRet(n)
+      \quad \sem{\loc}_\senv \eqdef \gRet(\loc) \\
+      \sem{x}_\senv &\eqdef \senv(x) \\
+      \sem{e_1 \oplus e_2}_\senv &\eqdef \gnatop{\oplus}(\sem{e_1}_\senv)(\sem{e_2}_\senv) \\
+      \sem{\syn{if}\;e_0\;\syn{then}\;e_1\;\syn{else}\;e_2}_\senv & \eqdef \gif(\sem{e_0}_\senv)(\sem{e_1}_\senv)(\sem{e_2}_\senv) \\
+      \sem{\eapp{e_1}{e_2}}_\senv &\eqdef \sem{e_1}_\senv \cbvap \sem{e_2}_\senv \\
+      \sem{\recval{f}{x}{\expr}}_\senv
+                                  &\eqdef \fix\;\lambda (\alpha : \latert \IT).\; 
+                                  \gFun\left(\latert\!\circ\!\left(\lambda \alpha'\;v.\;
+                                  \sem{\expr}_{\senv[x\mapsto v,\;f\mapsto \alpha']}\right)(\alpha)\right) \\
+      \sem{\kw{NewPrng}}_\senv &\eqdef \mathrm{PRNG\_NEW}\;\gRet \\
+      \sem{\kw{DelPrng}\;e}_\senv &\eqdef \getret(\mathrm{PRNG\_DEL})(\sem{e}_\senv) \\
+      \sem{\kw{Rand}\;e}_\senv &\eqdef \getret(\mathrm{PRNG\_GEN})(\sem{e}_\senv) \\
+      \sem{\kw{Seed}\;e_1\;e_2}_\senv &\eqdef \mathrm{SeedGit}\;(\sem{e_1}_\senv)\;(\sem{e_2}_\senv)
+    \end{align*}
+
+    (object language) recursion as (meta theory) guarded recursion. \(\recval{f}{x}{e}\)
+    \begin{enumerate}
+      \item use \(\fix\), construct \(\IT\) given \(\alpha : \latert \IT\)
+      \item use \(\gFun\), construct \(\latert (\IT \to \IT)\)
+      \item use \texttt{laterO\_map}, construct \(\IT \to \IT\)
+      \item take input \(v : \IT\), construct \(\IT\)
+      \item interpret \(e\) with \(f = \alpha\) and \(x = v\)
+    \end{enumerate}
+
+    \framebreak
+    \((K : \iECtx\ \Gamma)\ (\senv : \Gamma \to \IT) \to (\sem{K}_\senv : \IT \to \IT)\)
+    \begin{align*}
+      \sem{\ctxhole}_\senv(\alpha) &\eqdef \alpha\\
+      \sem{K\;e}_\senv(\alpha) &\eqdef \sem{K}_\senv(\alpha)\cbvap\sem{e}_\senv
+      \quad \sem{v\;K}_\senv(\alpha) \eqdef \sem{v}_\senv\cbvap\sem{K}_\senv(\alpha)\\
+      \sem{K \oplus e}_\senv(\alpha) &\eqdef \gnatop{\oplus}(\sem{K}_\senv(\alpha))(\sem{e}_\senv) \\
+      \quad \sem{v \oplus K}_\senv(\alpha) &\eqdef \gnatop{\oplus}(\sem{e}_\senv)(\sem{K}_\senv(\alpha))\\
+      \sem{\syn{if}\;K\;\syn{then}\;e_1\;\syn{else}\;e_2}(\alpha) & \eqdef \gif(\sem{K}_\senv(\alpha))(\sem{e_1}_\senv)(\sem{e_2}_\senv)\\
+      \sem{\kw{DelPrng}\;K}_\senv(\alpha) &\eqdef \getret(\mathrm{PRNG\_DEL})(\sem{K}_\senv(\alpha)) \\
+      \sem{\kw{Rand}\;K}_\senv(\alpha) &\eqdef \getret(\mathrm{PRNG\_GEN})(\sem{K}_\senv(\alpha)) \\
+      \sem{\kw{Seed}\;K\;e}_\senv(\alpha) &\eqdef \mathrm{SeedGit}\;(\sem{K}_\senv(\alpha))\;(\sem{e}_\senv)\\
+      \sem{\kw{Seed}\;v\;K}_\senv(\alpha) &\eqdef \mathrm{SeedGit}\;(\sem{v}_\senv)\;(\sem{K}_\senv(\alpha))\\
+    \end{align*}
+    \(\mathrm{SeedGit}\;(\gRet\,\ell)\;(\gRet\,n) \equiv \mathrm{PRNG\_SEED(\ell,n)}\).\\
+    \(\mathrm{SeedGit}\;(-)\;\beta\) and \(\mathrm{SeedGit}\;\alpha_v\;(-)\) are GItree homomorphisms.
+    \vfill
+    \(\sem{K}_\senv\) is always a GItree homomorphism.\\
+    The translation respects the correct order of evaluation.
+  \end{frame}
+
+  \begin{frame}[allowframebreaks]{Computational Adequacy}
+     Binary logical relation \(\alpha \curlyeqprec e\): if \(e\) runs to a value \(v\), then \(\sem{e}\) runs to \(\sem{v}\).
+     \begin{align*}
+       \mathcal{V} & : \iType \to \mathrm{Rel}(\IT,\iVal) \\
+       \mathcal{V}_{\tunit}(\alpha_v,v) &\eqdef \alpha_v \equiv \gRet(()) \land v \equiv \vunit \\
+       \mathcal{V}_{\tnat}(\alpha_v,v)  &\eqdef \exists n.\; \alpha_v \equiv \gRet(n) \land v \equiv n \\
+       \mathcal{V}_{\syn{prng}}(\alpha_v,v) &\eqdef \exists \loc.\;
+       \alpha_v \equiv \gRet(\loc) \land v \equiv \loc \star \knownprng(\loc) \\
+       \mathcal{V}_{\type_1 \to \type_2}(\alpha_v,v) &\eqdef \exists f.\;
+       \alpha_v \equiv \gFun(f) \land
+       \Box\forall \beta_v,u.\; \mathcal{V}_{\type_1}(\beta_v,u) \wand
+       \mathcal{E}_{\type_2}(\gFun(f)\cbvap \beta_v,\; \eapp{v}{u})\\
+       \mathcal{E} & : \iType \to \mathrm{Rel}(\IT,\iExpr) \\[0.6ex]
+       \mathcal{E}_{\type}(\alpha,e) &\eqdef \forall \sigma.\;
+       \hasstate(\sigma) \star \hasprngs(\sigma) \wand
+       \wpre{\alpha}{\alpha_v.\; \exists v,\sigma'.\;
+         \begin{array}[t]{ll}
+        &(e,\sigma) \redu^\ast (v,\sigma')\\
+           \star & \hasstate(\sigma')\\
+           \star & \hasprngs(\sigma')\\
+           \star & \mathcal{V}_{\type}(\alpha_v,v)
+       \end{array}} \\[4ex]
+       \mathcal{C} &: (\Gamma : \mathrm{Ctx}) \to \mathrm{Rel}(\Gamma\to \IT, \Gamma \to \iVal) \\
+       \mathcal{C}_{\Gamma}(\senv,\env) &\eqdef \forall x\in\Gamma.\; \mathcal{V}_{\Gamma(x)}(\senv(x),\env(x)) \\
+       \typedSem{\Gamma}{e}{\type} & \eqdef
+       \forall \senv,\env.\;
+       \mathcal{C}_{\Gamma}(\env,\senv) \wand
+       \mathcal{E}_{\type}(\sem{e}_\senv,\; e[\env])
+     \end{align*}
+   \end{frame}
+   \begin{frame}{Proof for \texttt{compat\_Seed}}
+     \[
+       \typedSem{\Gamma}{e_l}{\syn{prng}} \wand \typedSem{\Gamma}{e_s}{\tnat} \wand
+       { \typedSem{\Gamma}{\kw{Seed}\;e_l\;e_s}{\tunit} }
+     \]
+     \begin{enumerate}[<+->]
+       \item Intro \(\senv : \Gamma \to \IT\), \(\env : \Gamma \to \iVal\), and \(\mathcal{C}_{\Gamma}(\env,\senv)\). Show \(\mathcal{E}_{\tunit}(\sem{\kw{Seed}\,e_l\,e_s}_\senv, \kw{Seed}\,e_l\,e_s)\).
+       \item Intro \(\sigma_0\) and \(\hasstate(\sigma_0) \star \hasprngs(\sigma_0)\). Show \(\wpre{\sem{\kw{Seed}\,e_l\,e_s}_\senv}{\ldots}\).
+       \item The interpretation \(\sem{\kw{Seed}\;e_l\;e_s}_\senv\equiv \mathrm{SeedGit}\;(\sem{e_l}_\senv)\;(\sem{e_s}_\senv)\).
+       \item Specialize \(e_l\) to \(\mathcal{E}_{\syn{prng}}(\sem{e_l}_\senv, \env(e_l))\).
+         Specialize on \(\sigma_0\) to get \(\wpre{\sem{e_l}_\senv}{\ldots}\).
+       \item \(\mathrm{SeedGit}\;(-);\beta\) is a homomorphism. Run \((\sigma_0,\sem{e_l}_\senv)\) to \((\sigma_1,\gRet\,l)\) with \(\hasstate(\sigma_1)\star \hasprngs(\sigma_1)\) and \(\knownprng(l)\).
+       \item Specialize \(e_s\) to \(\mathcal{E}_{\tnat}(\sem{e_s}_\senv, \env(e_s))\).
+         Specialize on \(\sigma_1\) to get \(\wpre{\sem{e_s}_\senv}{\ldots}\).
+       \item \(\mathrm{SeedGit}\;(\gRet\,l);(-)\) is a homomorphism. Run \((\sigma_1,\sem{e_s}_\senv)\) to \((\sigma_2,\gRet\,n)\) with \(\hasstate(\sigma_2)\star \hasprngs(\sigma_2)\).
+       \item Now \(\mathrm{SeedGit}\;(\gRet\,l)\;(\gRet\,n) \equiv \mathrm{PRNG\_SEED}(l,n)\). Show\\
+         \(\wpre{\{\mathrm{PRNG\_SEED}(l,n)\}}{\alpha_v . \alpha_v \equiv \gRet() \star (\sigma_2,\syn{Seed}\;l\;n) \redus (\langle\rangle,\sigma_3) \star \cdots}\)
+         with \(\hasstate(\sigma_3)\star\hasprngs(\sigma_3)\)
+       \item Run GItree with \texttt{WP-PRNG-SEED}. Run \(\lambda_\prng\) with head reduction rule for \(\syn{Seed}\).
+     \end{enumerate}
+   \end{frame}
+
+  \section{Discussions}
+  \begin{frame}{Future work}
+    \begin{block}{Sum up and Recap}
+      \begin{enumerate}
+        \item Background: Recursion i Iris, SKLR i Iris, GItrees, etc.
+        \item PRNG effect theory: ghost theory and program logic.
+        \item GItree-based interpretation of \(\lambda_\prng\).
+        \item Logical relations for computational adequacy, a repertoire.
+      \end{enumerate}
+    \end{block}
+
+    \pause
+    \vfill
+
+    \small
+    \begin{itemize}
+      \item \demph{\(\mathrm{PRNG\_DEL}\): frac own (ghost theory) and substructural type system (\(\lambda_\prng\) language)}
+      \item \demph{GItrees models untyped effectful lambda calculus.
+        Generalizing guarded delay monads for typed effectful languages?}
+      \item Reify into (higher-order) state\&maybe monad \(\xlongrightarrow{}\) reify into prob and/or non-deter monad.
+      \item Probabilistic (true) randomness \(\xlongleftarrow{}\) Pseudo-randomness \(\xlongrightarrow{}\) Non-determinism\footnote{\(\forall\) / \(\exists\). Must/May}.\\
+        Same signature; different reifiers, ghost theory, and program logics.
+      \item Two extremes: full control \(\ell \pointsto \alpha\) v.s. no control \(\knownprng(\ell)\)\\
+        Partial knowledge e.g., last observed state of an external automaton.
+      \item GItree-based denotations might be fully abstract.
+      \item \(\wpre{\sem{e}}{\Phi}\) and \(\wpre{e}{\overline{\Phi}}\). (cf. Program logics \`a la carte)
+      \item Bisimulation on GItrees (cf. \texttt{eq-up-to-tau} in ITrees).
+    \end{itemize}
+  \end{frame}
+
+
+\end{document}
+
+
+

@@ -6,10 +6,6 @@
 \usepackage{extarrows}
 \usepackage{stmaryrd}
 \usepackage{xcolor}
-\definecolor{sblue}{cmyk}{1,.72,0,.38}
-\definecolor{lightTeal}{cmyk}{.2,0,.1,0}
-\definecolor{lightGrey}{gray}{.85}
-\definecolor{lightMagenta}{cmyk}{0,.5,0,.1}
 \usepackage{naive-ebnf}
 \usepackage{url}
 
@@ -22,9 +18,6 @@ style=alphabetic,
 sorting=ynt
 ]{biblatex}
 \addbibresource{refs.bib}
-
-\usepackage{listings}
-\definecolor{LightGray}{gray}{0.95}
 
 \usepackage{mathpartir}
 \usepackage{hyperref}
@@ -63,7 +56,6 @@ sorting=ynt
 \newcommand{\efread}{\mathrm{read}}
 \newcommand{\efwrite}{\mathrm{write}}
 
-\newcommand{\To}{\implies}
 \newcommand{\redu}{\mapsto}
 \newcommand{\redus}{\redu^\ast}
 \newcommand{\Redu}{\rightsquigarrow}
@@ -101,17 +93,13 @@ sorting=ynt
 \newcommand{\hasprngs}{\textsf{has\_prngs}}
 \newcommand{\prngCtx}{\knowInv{\iota p}{\exists \sigma.\; \hasstate(\sigma) * \hasprngs(\sigma)}}
 \newcommand{\heapCtx}{\knowInv{\iota h}{\exists \sigma_h.\; \hasstate(\sigma_h)}}
-\newcommand{\LitV}{\mathrm{LitV}}
-\newcommand{\LitPrng}{\mathrm{LitPrng}}
-\newcommand{\safety}{\mathrm{s}}
+
 \newcommand{\Excl}{\operatorname{Excl}}
 \newcommand{\AuthFull}{\operatorname{\bullet}\;}
 \newcommand{\AuthFrag}{\operatorname{\circ}\;}
 \newcommand{\EmptyK}{\mathrm{EmptyK}}
 \newcommand{\recval}[3]{\syn{rec}\;#1(#2)=#3}
-\newcommand{\natopinterp}[3]{\llbracket #1 \rrbracket(#2,#3)}
 
-\newcommand{\IH}{\mathrm{IH}}
 
 \newcommand{\TODO}[1]{
   \begin{center}
